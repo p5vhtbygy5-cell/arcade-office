@@ -13,7 +13,7 @@ button{font-family:inherit;font-size:9px;background:#200040;color:#00f0ff;border
 button.on{background:#00f0ff;color:#12002a}
 #log{flex:1;overflow-y:auto;margin:8px 10px;line-height:1.7;word-wrap:break-word}#log .sys{color:#888}#log .tag{color:#ffe600}
 #form{display:flex;margin:10px}#msg{flex:1;font-family:inherit;font-size:9px;background:#000;color:#fff;border:2px solid #ff2bd6;padding:6px}
-#online{margin:0 10px 8px;color:#ff2bd6}
+#plist{margin:0 10px 8px;line-height:1.7;max-height:140px;overflow-y:auto;font-size:8px}#plist .b{color:#888}#online{margin:0 10px 8px;color:#ff2bd6}
 #login{position:fixed;inset:0;background:#0a0018ee;display:flex;align-items:center;justify-content:center;z-index:9}
 #login .box{border:3px solid #ff2bd6;padding:24px;background:#12002a;box-shadow:0 0 30px #ff2bd6;text-align:center;width:420px}
 #login h1{font-size:16px;color:#ffe600;text-shadow:0 0 8px #ff2bd6;line-height:1.6}
@@ -26,8 +26,8 @@ button.on{background:#00f0ff;color:#12002a}
 <p>Wpisz ksywkę:</p><input id="nick" maxlength="16" placeholder="np. SatoshiFan">
 <p>Kolor awatara:</p><div id="colors"></div><p>Postać:</p><div id="sprites"></div>
 <button id="go" style="margin-top:12px;font-size:12px">▶ WEJDŹ</button><p class="blink" style="color:#ff2bd6;margin-top:14px">WCIŚNIJ START</p></div></div>
-<div id="app"><div id="gamewrap" class="crt"><canvas id="c" width="960" height="600"></canvas></div>
-<div id="side"><h2>⚡ CZAT</h2><div id="zone">Strefa: -</div><div id="online">Online: 0</div>
+<div id="app"><div id="gamewrap" class="crt"><canvas id="c" width="960" height="888"></canvas></div>
+<div id="side"><h2>⚡ CZAT</h2><div id="zone">Strefa: -</div><div id="online">Online: 0</div><div id="plist"></div>
 <div id="tabs"><button id="tg" class="on">Globalny</button><button id="tz">Strefa</button></div>
 <div id="log"></div><form id="form"><input id="msg" maxlength="200" placeholder="Napisz… (Enter)" autocomplete="off"><button>OK</button></form>
 <div style="margin:0 10px 10px;color:#666;line-height:1.6">Ruch: strzałki / WASD<br>Enter: czat, Esc: wróć do gry</div></div></div>

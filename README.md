@@ -1,6 +1,12 @@
 # Arcade Office – Krypto Biuro 🕹️🚀
 Wirtualne biuro multiplayer w stylu retro pixel-art (Node.js + Express + Socket.IO, klient na canvasie, bez kroku budowania).
 
+## Strefy
+Parkiet Tradingowy, Sala Spotkań, Chillout / Lounge, Dach „Moon”, **Gabinet CHIEF** oraz **Workspace Botów** (dolne skrzydło, wejście z korytarza). Czat strefowy rozpoznaje wszystkie strefy.
+
+## Boty NPC
+Serwer wyświetla 7 botów grupy: CHIEF (we własnym gabinecie) oraz SIZE, SCAN, BOOK, RISK, VET, FILLS przy podpisanych biurkach. Każdy ma własny robotyczny sprite, animację w spoczynku i co kilka sekund dymek statusu (zdarzenie `bubble`). Na liście online są oznaczone jako [BOT]. Konfiguracja: `BOT_CFG` w `server.js`, pozycje: `BOT_DESKS` w `public/map.js`.
+
 ## Uruchomienie lokalnie
     npm install
     npm start            # http://localhost:3000  (obsługuje zmienną PORT)

@@ -4,6 +4,10 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 for(const [n,s] of [['a',a],['b',b]]){s.onAny((e,d)=>got[n].push([e,d]));}
 a.emit('join',{name:'Alicja',color:'#00f0ff',sprite:1});await wait(200);b.emit('join',{name:'Bartek',color:'#39ff14',sprite:2});await wait(300);
 chk(got.a.some(([e,d])=>e=='playerJoined'&&d.name=='Bartek'),'A widzi dołączenie B');
+const init=got.a.find(([e])=>e=='init')[1];const bots=Object.values(init.players).filter(p=>p.bot);
+chk(bots.length==7&&['CHIEF','SIZE','SCAN','BOOK','RISK','VET','FILLS'].every(n=>bots.some(b=>b.name==n)),'init zawiera 7 botów NPC oznaczonych bot:true');
+chk(bots.find(b=>b.name=='CHIEF').zone=='chief'&&bots.filter(b=>b.zone=='bots').length==6,'CHIEF w gabinecie, 6 botów w Workspace Botów');
+const M=require('./public/map.js');chk(M.zoneAt(7*24,30*24)=='chief'&&M.zoneAt(20*24,30*24)=='bots'&&M.zoneAt(10*24,5*24)=='trading','Nowe strefy rozpoznawane przez zoneAt');
 a.emit('move',{x:250,y:300,dir:'right'});await wait(200);
 chk(got.b.some(([e,d])=>e=='playerMoved'&&d.id==a.id&&d.x==250),'B dostaje ruch A');
 a.emit('move',{x:900,y:300});await wait(200);chk(got.a.some(([e])=>e=='correct'),'Serwer odrzuca teleport');
@@ -12,4 +16,6 @@ for(let y=300;y>=250;y-=10){a.emit('move',{x:240,y,dir:'up'});await wait(30);}aw
 a.emit('chat',{text:'tajne',scope:'zone'});await wait(200);
 chk(got.a.some(([e,d])=>e=='chat'&&d.text=='tajne'&&d.zone=='trading'),'A dostaje własną wiadomość strefową (trading)');
 chk(!got.b.some(([e,d])=>e=='chat'&&d.text=='tajne'),'B (inna strefa) NIE dostaje wiadomości strefowej');
+await wait(4300);chk(got.a.some(([e,d])=>e=='bubble'&&String(d.id).startsWith('bot-')&&d.text),'Boty wysyłają dymki statusu');
+chk(!got.a.some(([e,d])=>e=='playerMoved'&&String(d.id).startsWith('bot-')),'Boty nie generują zdarzeń ruchu');
 b.disconnect();await wait(200);chk(got.a.some(([e])=>e=='playerLeft'),'A widzi wyjście B');a.disconnect();process.exit(ok?0:1);})();
