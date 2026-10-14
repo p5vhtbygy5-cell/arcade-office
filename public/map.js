@@ -5,7 +5,7 @@ const ZONES=[
  {id:'trading',name:'Parkiet Tradingowy',x:1,y:1,w:18,h:11,color:'#ff2bd6'},
  {id:'meeting',name:'Sala Spotkań',x:21,y:1,w:18,h:11,color:'#00f0ff'},
  {id:'lounge',name:'Chillout / Lounge',x:1,y:13,w:18,h:11,color:'#39ff14'},
- {id:'moon',name:'Dach "Moon" 🚀',x:21,y:13,w:18,h:11,color:'#ffe600'},
+ {id:'board',name:'Tablica Pozycji',x:21,y:13,w:18,h:11,color:'#ffe600'},
  {id:'chief',name:'Gabinet CHIEF',x:1,y:27,w:12,h:9,color:'#ff3b3b'},
  {id:'bots',name:'Workspace Botów',x:14,y:27,w:25,h:9,color:'#b026ff'},
 ];
@@ -29,7 +29,7 @@ add('sofa',3,15,6,1); add('sofa',3,21,6,1); add('plant',16,14); add('plant',16,2
 add('bigdesk',4,31,6,2); add('plant',2,28); add('plant',11,28); add('safe',11,34);
 const BOT_DESKS=[];['SIZE','SCAN','BOOK','RISK','VET','FILLS'].forEach((n,i)=>{const x=16+(i%3)*8,y=29+Math.floor(i/3)*4;add('botdesk',x,y,3,1);furniture[furniture.length-1].label=n;BOT_DESKS.push({name:n,x:(x+1.5)*T,y:(y-0.4)*T});});
 BOT_DESKS.unshift({name:'CHIEF',x:7*T,y:30.4*T});
-add('rocket',33,15,2,3); add('telescope',24,16); add('plant',37,22); add('plant',22,22);
+add('scoreboard',22,14,16,5); add('bench',24,20,4,1); add('bench',32,20,4,1); add('plant',37,22); add('plant',22,22);
 function zoneAt(px,py){const tx=px/T,ty=py/T;for(const z of ZONES)if(tx>=z.x&&tx<z.x+z.w&&ty>=z.y&&ty<z.y+z.h)return z.id;return 'korytarz';}
 function blocked(px,py){const r=8;for(const [dx,dy] of [[-r,-r],[r,-r],[-r,r],[r,r]]){const tx=Math.floor((px+dx)/T),ty=Math.floor((py+dy)/T);if(tx<0||ty<0||tx>=W||ty>=H||solid[ty][tx])return true;}return false;}
 const api={BOT_DESKS,T,W,H,ZONES,solid,furniture,zoneAt,blocked,SPAWN:{x:10*T,y:12.5*T}};

@@ -4,9 +4,9 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 for(const [n,s] of [['a',a],['b',b]]){s.onAny((e,d)=>got[n].push([e,d]));}
 a.emit('join',{name:'Alicja',color:'#00f0ff',sprite:1});await wait(200);b.emit('join',{name:'Bartek',color:'#39ff14',sprite:2});await wait(300);
 chk(got.a.some(([e,d])=>e=='playerJoined'&&d.name=='Bartek'),'A widzi dołączenie B');
-const init=got.a.find(([e])=>e=='init')[1];const bots=Object.values(init.players).filter(p=>p.bot);
+const M0=require('./public/map.js');const init=got.a.find(([e])=>e=='init')[1];const bots=Object.values(init.players).filter(p=>p.bot);
 chk(bots.length==7&&['CHIEF','SIZE','SCAN','BOOK','RISK','VET','FILLS'].every(n=>bots.some(b=>b.name==n)),'init zawiera 7 botów NPC oznaczonych bot:true');
-chk(bots.find(b=>b.name=='CHIEF').zone=='chief'&&bots.filter(b=>b.zone=='bots').length==6,'CHIEF w gabinecie, 6 botów w Workspace Botów');
+chk(M0.zoneAt(30*24,16*24)=='board','Strefa Tablica Pozycji (board) zamiast Moon');chk(bots.find(b=>b.name=='CHIEF').zone=='chief'&&bots.filter(b=>b.zone=='bots').length==6,'CHIEF w gabinecie, 6 botów w Workspace Botów');
 const M=require('./public/map.js');chk(M.zoneAt(7*24,30*24)=='chief'&&M.zoneAt(20*24,30*24)=='bots'&&M.zoneAt(10*24,5*24)=='trading','Nowe strefy rozpoznawane przez zoneAt');
 a.emit('move',{x:250,y:300,dir:'right'});await wait(200);
 chk(got.b.some(([e,d])=>e=='playerMoved'&&d.id==a.id&&d.x==250),'B dostaje ruch A');
@@ -18,4 +18,22 @@ chk(got.a.some(([e,d])=>e=='chat'&&d.text=='tajne'&&d.zone=='trading'),'A dostaj
 chk(!got.b.some(([e,d])=>e=='chat'&&d.text=='tajne'),'B (inna strefa) NIE dostaje wiadomości strefowej');
 await wait(4300);chk(got.a.some(([e,d])=>e=='bubble'&&String(d.id).startsWith('bot-')&&d.text),'Boty wysyłają dymki statusu');
 chk(!got.a.some(([e,d])=>e=='playerMoved'&&String(d.id).startsWith('bot-')),'Boty nie generują zdarzeń ruchu');
+// ---- API Tablicy Pozycji ----
+const TOK=process.env.BOT_API_TOKEN||require('fs').readFileSync(__dirname+'/.bot-token','utf8').trim();
+const api=(m,u,body,tok=TOK)=>fetch(U+u,{method:m,headers:{'content-type':'application/json',...(tok?{authorization:'Bearer '+tok}:{})},body:body?JSON.stringify(body):undefined}).then(async r=>({s:r.status,j:await r.json().catch(()=>null)}));
+let r=await api('POST','/api/positions',{bot:'SCAN',symbol:'TESTX',side:'LONG',size:1,entry:100},null);chk(r.s==401,'POST bez tokenu -> 401');
+r=await api('POST','/api/positions',{bot:'SCAN',symbol:'TESTX',side:'LONG',size:1,entry:100},'zly');chk(r.s==401,'POST ze złym tokenem -> 401');
+r=await api('POST','/api/positions',{bot:'NIKT',symbol:'x',side:'UP',size:-1,entry:'abc'});chk(r.s==400&&r.j.details.length>=4,'Walidacja danych -> 400');
+const n0=got.b.length;r=await api('POST','/api/positions',{id:'test-1',bot:'SCAN',symbol:'TESTX',side:'LONG',size:2,entry:100,price:110,note:'test'});
+chk(r.s==201&&r.j.id=='test-1'&&r.j.side=='LONG','Otwarcie pozycji -> 201');await wait(200);
+chk(got.b.slice(n0).some(([e,d])=>e=='position'&&d.id=='test-1'),'Broadcast otwarcia przez Socket.IO');
+chk(got.b.slice(n0).some(([e,d])=>e=='bubble'&&d.id=='bot-SCAN'&&/Otwieram/.test(d.text))&&got.b.slice(n0).some(([e,d])=>e=='chat'&&d.system&&/SCAN/.test(d.text)),'Bot SCAN: dymek + wiadomość systemowa');
+r=await api('GET','/api/positions',null,null);chk(r.s==200&&r.j.some(p=>p.id=='test-1'),'GET /api/positions (publiczny)');
+r=await api('PATCH','/api/positions/test-1',{price:120});chk(r.s==200&&r.j.price==120,'PATCH aktualizuje cenę');
+r=await api('PATCH','/api/positions/test-1',{price:120},null);chk(r.s==401,'PATCH bez tokenu -> 401');
+chk(JSON.parse(require('fs').readFileSync(__dirname+'/positions.json','utf8')+'')['test-1']||(await wait(400),JSON.parse(require('fs').readFileSync(__dirname+'/positions.json','utf8'))['test-1']),'Zapis do positions.json');
+const n1=got.b.length;r=await api('POST','/api/positions/test-1/close');chk(r.s==200&&r.j.closed&&Math.abs(r.j.pnlPct-20)<1e-9,'Zamknięcie (POST /close), PnL +20%');await wait(200);
+chk(got.b.slice(n1).some(([e,d])=>e=='positionClosed'&&d=='test-1'),'Broadcast zamknięcia');
+await api('POST','/api/positions',{id:'test-2',bot:'RISK',symbol:'TESTY',side:'SHORT',size:1,entry:50,price:45});r=await api('DELETE','/api/positions/test-2');chk(r.s==200&&Math.abs(r.j.pnlPct-10)<1e-9,'DELETE zamyka SHORT, PnL +10%');
+r=await api('DELETE','/api/positions/test-2');chk(r.s==404,'Ponowne zamknięcie -> 404');
 b.disconnect();await wait(200);chk(got.a.some(([e])=>e=='playerLeft'),'A widzi wyjście B');a.disconnect();process.exit(ok?0:1);})();

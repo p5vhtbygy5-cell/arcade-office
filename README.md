@@ -2,7 +2,7 @@
 Wirtualne biuro multiplayer w stylu retro pixel-art (Node.js + Express + Socket.IO, klient na canvasie, bez kroku budowania).
 
 ## Strefy
-Parkiet Tradingowy, Sala Spotkań, Chillout / Lounge, Dach „Moon”, **Gabinet CHIEF** oraz **Workspace Botów** (dolne skrzydło, wejście z korytarza). Czat strefowy rozpoznaje wszystkie strefy.
+Parkiet Tradingowy, Sala Spotkań, Chillout / Lounge, **Tablica Pozycji**, **Gabinet CHIEF** oraz **Workspace Botów** (dolne skrzydło, wejście z korytarza). Czat strefowy rozpoznaje wszystkie strefy.
 
 ## Boty NPC
 Serwer wyświetla 7 botów grupy: CHIEF (we własnym gabinecie) oraz SIZE, SCAN, BOOK, RISK, VET, FILLS przy podpisanych biurkach. Każdy ma własny robotyczny sprite, animację w spoczynku i co kilka sekund dymek statusu (zdarzenie `bubble`). Na liście online są oznaczone jako [BOT]. Konfiguracja: `BOT_CFG` w `server.js`, pozycje: `BOT_DESKS` w `public/map.js`.
@@ -30,3 +30,34 @@ Potrzebny hosting z trwałym procesem i WebSocketami (nie serverless typu Vercel
 - Szybki test bez wdrożenia: `npx localtunnel --port 3000` lub `cloudflared tunnel --url http://localhost:3000`.
 
 Stan graczy jest trzymany w pamięci serwera – uruchamiaj jedną instancję (skalowanie wymagałoby adaptera Redis dla Socket.IO).
+
+## Tablica Pozycji
+Strefa z neonową tablicą otwartych pozycji (na mapie) oraz pełną tabelą HTML, która otwiera się automatycznie po wejściu do strefy lub przyciskiem **📊 TABLICA**. LONG – zielony, SHORT – czerwony. Co 30 s serwer pobiera ceny z publicznego API Binance (`SYMBOL` lub `SYMBOLUSDT`); jeśli niedostępne – używana jest cena podana przez bota. Wyłączenie: `LIVE_PRICES=0`. Pozycje zapisywane są w `positions.json` (przetrwają restart, plik w .gitignore).
+
+## API dla botów
+Zapis wymaga nagłówka `Authorization: Bearer <BOT_API_TOKEN>`. Ustaw zmienną `BOT_API_TOKEN` (na Render: Environment). Jeśli jej brak, serwer generuje token przy starcie i zapisuje go do pliku `.bot-token` (w logu jest tylko ścieżka). Dozwolone boty: CHIEF, SIZE, SCAN, BOOK, RISK, VET, FILLS.
+
+| Metoda | Ścieżka | Opis |
+|---|---|---|
+| GET | `/api/positions` | lista otwartych pozycji (publiczna) |
+| POST | `/api/positions` | otwarcie / aktualizacja (z `id`) – `{id?, bot, symbol, side, size, entry, price?, note?}` |
+| PATCH | `/api/positions/:id` | aktualizacja `price`, `size`, `note` |
+| POST | `/api/positions/:id/close` | zamknięcie |
+| DELETE | `/api/positions/:id` | zamknięcie |
+
+    export URL=http://localhost:3000 TOKEN=$(cat .bot-token)
+    # otwarcie
+    curl -X POST $URL/api/positions -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+      -d '{"id":"btc-1","bot":"SCAN","symbol":"BTCUSDT","side":"LONG","size":0.1,"entry":67000,"note":"breakout"}'
+    # aktualizacja ceny/wielkości
+    curl -X PATCH $URL/api/positions/btc-1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"price":68500}'
+    # zamknięcie
+    curl -X POST $URL/api/positions/btc-1/close -H "Authorization: Bearer $TOKEN"
+    # lista
+    curl $URL/api/positions
+
+Odpowiedzi: 201 (nowa), 200 (OK), 400 (`details` z listą błędów), 401 (brak/zły token), 404 (brak pozycji). Otwarcie i zamknięcie wywołuje dymek nad odpowiednim botem i komunikat systemowy na czacie; zmiany są rozsyłane na żywo (Socket.IO: `positions`, `position`, `positionClosed`).
+
+Uwaga (Render free): dysk jest efemeryczny – `positions.json` znika przy redeployu. Do trwałego zapisu użyj Persistent Disk i `POSITIONS_FILE=/data/positions.json`.
+
+`./ss-positions.sh add|del` – dodaje/usuwa pozycje TEST (tylko do zrzutów ekranu).

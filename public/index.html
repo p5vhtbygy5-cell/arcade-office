@@ -20,6 +20,9 @@ button.on{background:#00f0ff;color:#12002a}
 #login input{font-family:inherit;width:100%;padding:8px;margin:10px 0;background:#000;color:#39ff14;border:2px solid #00f0ff}
 #colors,#sprites{display:flex;gap:6px;justify-content:center;margin:8px 0}.sw{width:28px;height:28px;border:2px solid #333;cursor:pointer}.sw.on{border-color:#fff;box-shadow:0 0 8px #fff}
 #sprites canvas{border:2px solid #333;box-shadow:none;cursor:pointer}#sprites canvas.on{border-color:#fff}
+#board{display:none;position:fixed;left:20px;bottom:20px;max-width:calc(100vw - 380px);max-height:45vh;overflow:auto;background:#050010f2;border:3px solid #ffe600;box-shadow:0 0 20px #ffe600;padding:10px;z-index:5;font-size:8px}
+#board.show{display:block}#board .bh{color:#ffe600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}#board table{border-collapse:collapse;width:100%}
+#board th{color:#00f0ff;text-align:left;padding:4px 8px;border-bottom:2px solid #00f0ff}#board td{padding:4px 8px}#board tr.long td:nth-child(-n+2){color:#39ff14}#board tr.short td:nth-child(-n+2){color:#ff3b3b}
 .blink{animation:b 1s steps(2) infinite}@keyframes b{50%{opacity:0}}
 </style></head><body>
 <div id="login"><div class="box"><h1>ARCADE OFFICE<br><span style="color:#00f0ff">KRYPTO BIURO</span></h1>
@@ -27,8 +30,9 @@ button.on{background:#00f0ff;color:#12002a}
 <p>Kolor awatara:</p><div id="colors"></div><p>Postać:</p><div id="sprites"></div>
 <button id="go" style="margin-top:12px;font-size:12px">▶ WEJDŹ</button><p class="blink" style="color:#ff2bd6;margin-top:14px">WCIŚNIJ START</p></div></div>
 <div id="app"><div id="gamewrap" class="crt"><canvas id="c" width="960" height="888"></canvas></div>
+<div id="board"><div class="bh">★ TABLICA POZYCJI ★ <button id="bclose">X</button></div><table><thead><tr><th>Symbol</th><th>Kierunek</th><th>Wielkość</th><th>Cena wejścia</th><th>Aktualna cena</th><th>PnL %</th><th>Bot</th><th>Czas otwarcia</th></tr></thead><tbody id="btbody"></tbody></table><div style="color:#666;margin-top:8px">• = cena live (Binance)</div></div>
 <div id="side"><h2>⚡ CZAT</h2><div id="zone">Strefa: -</div><div id="online">Online: 0</div><div id="plist"></div>
-<div id="tabs"><button id="tg" class="on">Globalny</button><button id="tz">Strefa</button></div>
+<button id="tb" style="margin:0 10px 8px;color:#ffe600;border-color:#ffe600">📊 TABLICA</button><div id="tabs"><button id="tg" class="on">Globalny</button><button id="tz">Strefa</button></div>
 <div id="log"></div><form id="form"><input id="msg" maxlength="200" placeholder="Napisz… (Enter)" autocomplete="off"><button>OK</button></form>
 <div style="margin:0 10px 10px;color:#666;line-height:1.6">Ruch: strzałki / WASD<br>Enter: czat, Esc: wróć do gry</div></div></div>
 <script src="/socket.io/socket.io.js"></script><script src="map.js"></script><script src="game.js"></script></body></html>

@@ -1,6 +1,7 @@
 const express=require('express'),http=require('http'),{Server}=require('socket.io'),path=require('path');
 const MAP=require('./public/map.js');
 const app=express(),srv=http.createServer(app),io=new Server(srv);
+app.use(express.json({limit:'20kb'}));
 app.use(express.static(path.join(__dirname,'public')));
 app.get('/health',(q,r)=>r.json({ok:true,players:Object.values(players).filter(p=>!p.bot).length,bots:Object.values(players).filter(p=>p.bot).length}));
 const players={};const COLORS=['#ff2bd6','#00f0ff','#39ff14','#ffe600','#ff6b00','#b026ff','#ffffff','#ff3b3b'];
@@ -15,7 +16,49 @@ const BOT_CFG={CHIEF:{color:'#ff3b3b',lines:['Koordynuję zespół...','Odprawa 
  FILLS:{color:'#ff2bd6',lines:['Realizuję zlecenia...','Fill po 68 012 $','Slippage minimalny.','Zlecenie wypełnione ✔']}};
 for(const b of MAP.BOT_DESKS){const c=BOT_CFG[b.name];players['bot-'+b.name]={id:'bot-'+b.name,name:b.name,color:c.color,sprite:0,bot:true,x:b.x,y:b.y,dir:'down',zone:MAP.zoneAt(b.x,b.y)};}
 setInterval(()=>{const ids=Object.keys(BOT_CFG);const n=ids[Math.random()*ids.length|0];const l=BOT_CFG[n].lines;io.emit('bubble',{id:'bot-'+n,text:l[Math.random()*l.length|0]});},4000);
+// ---- Tablica Pozycji: API dla botów ----
+const fs=require('fs'),crypto=require('crypto');
+const POS_FILE=process.env.POSITIONS_FILE||path.join(__dirname,'positions.json'),TOKEN_FILE=path.join(__dirname,'.bot-token');
+let BOT_TOKEN=process.env.BOT_API_TOKEN;
+if(!BOT_TOKEN){try{BOT_TOKEN=fs.readFileSync(TOKEN_FILE,'utf8').trim();}catch{}
+  if(!BOT_TOKEN){BOT_TOKEN=crypto.randomBytes(24).toString('hex');fs.writeFileSync(TOKEN_FILE,BOT_TOKEN+'\n',{mode:0o600});}
+  console.log('BOT_API_TOKEN nie ustawiony - token zapisany w pliku '+TOKEN_FILE);}
+let positions={};try{positions=JSON.parse(fs.readFileSync(POS_FILE,'utf8'))||{};}catch{}
+const save=()=>{try{fs.writeFileSync(POS_FILE+'.tmp',JSON.stringify(positions,null,1));fs.renameSync(POS_FILE+'.tmp',POS_FILE);}catch(e){console.error('Zapis positions.json nieudany:',e.message);}};
+const BOT_NAMES=Object.keys(BOT_CFG);
+function auth(q,r,n){const h=q.get('authorization')||'';const t=h.startsWith('Bearer ')?h.slice(7):'';
+  const a=Buffer.from(t),b=Buffer.from(BOT_TOKEN);if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return r.status(401).json({error:'Brak autoryzacji'});n();}
+const num=v=>typeof v==='number'?v:(typeof v==='string'&&v.trim()!==''?Number(v):NaN);
+const pos=v=>{const x=num(v);return isFinite(x)&&x>0&&x<1e12?x:null;};
+function botSay(bot,text){io.emit('bubble',{id:'bot-'+bot,text});io.emit('chat',{system:true,text:`🤖 ${bot}: ${text}`,scope:'global',ts:Date.now()});}
+app.get('/api/positions',(q,r)=>r.json(Object.values(positions)));
+app.post('/api/positions',auth,(q,r)=>{const b=q.body||{};const e=[];
+  const bot=String(b.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))e.push('bot: jeden z '+BOT_NAMES.join(','));
+  const symbol=String(b.symbol||'').toUpperCase();if(!/^[A-Z0-9]{2,20}$/.test(symbol))e.push('symbol: 2-20 znaków A-Z0-9');
+  const side=String(b.side||'').toUpperCase();if(!['LONG','SHORT'].includes(side))e.push('side: LONG lub SHORT');
+  const size=pos(b.size),entry=pos(b.entry);if(size==null)e.push('size: liczba > 0');if(entry==null)e.push('entry: liczba > 0');
+  const price=b.price==null?null:pos(b.price);if(b.price!=null&&price==null)e.push('price: liczba > 0');
+  if(b.id!=null&&!/^[A-Za-z0-9_-]{1,40}$/.test(String(b.id)))e.push('id: 1-40 znaków A-Za-z0-9_-');
+  if(e.length)return r.status(400).json({error:'Błędne dane',details:e});
+  const id=b.id!=null?String(b.id):crypto.randomBytes(6).toString('hex');const old=positions[id];
+  const p={id,bot,symbol,side,size,entry,price:price??old?.price??null,priceSource:price!=null?'bot':(old?.priceSource||null),note:b.note?String(b.note).replace(/[<>]/g,'').slice(0,140):(old?.note||''),openedAt:old?.openedAt||Date.now(),updatedAt:Date.now()};
+  positions[id]=p;save();io.emit('position',p);
+  if(!old)botSay(bot,`Otwieram ${side} ${symbol} @ ${entry}`);r.status(old?200:201).json(p);});
+app.patch('/api/positions/:id',auth,(q,r)=>{const p=positions[q.params.id];if(!p)return r.status(404).json({error:'Nie znaleziono pozycji'});const b=q.body||{};const e=[];
+  if(b.price!=null&&pos(b.price)==null)e.push('price: liczba > 0');if(b.size!=null&&pos(b.size)==null)e.push('size: liczba > 0');
+  if(b.price==null&&b.size==null&&b.note==null)e.push('podaj price, size lub note');if(e.length)return r.status(400).json({error:'Błędne dane',details:e});
+  if(b.price!=null){p.price=pos(b.price);p.priceSource='bot';}if(b.size!=null)p.size=pos(b.size);if(b.note!=null)p.note=String(b.note).replace(/[<>]/g,'').slice(0,140);
+  p.updatedAt=Date.now();save();io.emit('position',p);r.json(p);});
+function close(q,r){const p=positions[q.params.id];if(!p)return r.status(404).json({error:'Nie znaleziono pozycji'});delete positions[p.id];save();io.emit('positionClosed',p.id);
+  const c=p.price??p.entry,pl=(c-p.entry)/p.entry*100*(p.side==='LONG'?1:-1);botSay(p.bot,`Zamykam ${p.side} ${p.symbol} (${pl>=0?'+':''}${pl.toFixed(2)}%)`);r.json({closed:true,position:p,pnlPct:+pl.toFixed(4)});}
+app.delete('/api/positions/:id',auth,close);app.post('/api/positions/:id/close',auth,close);
+// live prices from Binance public ticker (every 30s); falls back to bot price
+async function refreshPrices(){const ps=Object.values(positions);if(!ps.length||process.env.LIVE_PRICES==='0')return;
+  try{const res=await fetch('https://api.binance.com/api/v3/ticker/price',{signal:AbortSignal.timeout(8000)});if(!res.ok)return;const m={};for(const t of await res.json())m[t.symbol]=+t.price;
+    for(const p of ps){const v=m[p.symbol]??m[p.symbol+'USDT'];if(v&&p.priceSource!=='bot-locked'){if(p.price!==v){p.price=v;p.priceSource='live';io.emit('position',p);}}}save();}catch{}}
+setInterval(refreshPrices,30000);setTimeout(refreshPrices,3000);
 io.on('connection',s=>{
+  s.emit('positions',Object.values(positions));
   s.on('join',d=>{
     const p={id:s.id,name:clean(d&&d.name,16)||'Anon',color:COLORS.includes(d&&d.color)?d.color:COLORS[0],sprite:Math.max(0,Math.min(3,(d&&d.sprite)|0)),x:MAP.SPAWN.x,y:MAP.SPAWN.y,dir:'down'};
     p.zone=MAP.zoneAt(p.x,p.y);players[s.id]=p;
