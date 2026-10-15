@@ -77,6 +77,24 @@ async function refreshTop10(){if(process.env.TOP10_MOCK==='1'){top10={updatedAt:
     top10={updatedAt:Date.now(),source:name,items};if(!deskTop10())io.emit('top10',top10);return top10;}catch(e){errs.push(name+': '+e.message);if(e.status===429&&name==='CoinGecko')console.log('CoinGecko 429 - używam zapasowego źródła');}}
   top10={...top10,error:'Nie udało się pobrać danych ('+errs.join('; ')+')'};top10Backoff=Date.now()+60000;console.log('Top10:',top10.error);io.emit('top10',top10);return top10;}
 setInterval(refreshTop10,TOP10_MS);setTimeout(refreshTop10,process.env.TOP10_MOCK==='1'?0:1500);
+// ---- Ticker (marquee on the top wall): world news from the local WorldMonitor + CoinGecko top 10, cached server-side ----
+// News: local WorldMonitor only (never api.worldmonitor.app). Crypto: CoinGecko public markets endpoint. Read-only GET /api/ticker.
+const WM_URL=(process.env.WM_URL||'http://[::1]:3004').replace(/\/$/,'');if(/worldmonitor\.app/i.test(WM_URL))throw new Error('WM_URL musi wskazywać lokalny WorldMonitor');
+const NEWS_MS=5*60000,CRYPTO_MS=60000,NEWS_CATS=['politics','us','europe','middleeast','asia','intel','finance','energy','africa','latam','ai','tech'];
+const ticker={news:{items:[],updatedAt:null,error:'brak danych',source:WM_URL},crypto:{items:[],updatedAt:null,error:'brak danych',source:'CoinGecko'}};
+const tickerOut=()=>({news:ticker.news,crypto:ticker.crypto});
+async function refreshNews(){try{const j=await getJSON(WM_URL+'/api/news/v1/list-feed-digest?variant=full&lang=en');const seen=new Set(),all=[];
+  for(const c of NEWS_CATS)for(const it of ((j.categories||{})[c]||{}).items||[]){const title=String(it.title||'').replace(/\s+/g,' ').trim();const k=title.toLowerCase().slice(0,60);if(!title||seen.has(k))continue;seen.add(k);
+   all.push({title:title.slice(0,140),source:String(it.source||'').slice(0,40),category:c,publishedAt:+it.publishedAt||null,score:+it.importanceScore||0});}
+  all.sort((a,b)=>b.score-a.score||(b.publishedAt||0)-(a.publishedAt||0));const items=all.slice(0,15);if(!items.length)throw new Error('pusta lista');
+  ticker.news={items,updatedAt:Date.now(),error:null,source:WM_URL};}
+ catch(e){ticker.news={...ticker.news,error:'WorldMonitor: '+e.message};}io.emit('ticker',tickerOut());}
+async function refreshCrypto(){try{const items=(await getJSON('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10'))
+   .map(c=>({rank:c.market_cap_rank,symbol:String(c.symbol).toUpperCase(),name:c.name,price:c.current_price,change24h:c.price_change_percentage_24h,marketCap:c.market_cap})).filter(c=>c.symbol&&isFinite(c.price));
+  if(!items.length)throw new Error('pusta lista');ticker.crypto={items,updatedAt:Date.now(),error:null,source:'CoinGecko'};}
+ catch(e){ticker.crypto={...ticker.crypto,error:'CoinGecko: '+e.message};}io.emit('ticker',tickerOut());}
+if(process.env.TICKER_OFF!=='1'){setTimeout(refreshNews,500);setTimeout(refreshCrypto,2500);setInterval(refreshNews,NEWS_MS);setInterval(refreshCrypto,CRYPTO_MS);}
+app.get('/api/ticker',(q,r)=>r.json(tickerOut()));
 // ---- Desk feed: /workspace/desk/board.json written by desk main.py (state.json + ledger) ----
 const DESK_BOARD=process.env.DESK_BOARD_FILE||'/workspace/desk/board.json';let desk=null,deskMtime=0;
 function deskPosition(){const p=desk&&desk.position;if(!p)return null;const hb=p.latest_heartbeat||{};const ref=p.entry_priceUSD??p.reference_priceUSD??null;
@@ -138,6 +156,7 @@ io.on('connection',s=>{
   s.emit('top10',deskTop10()||top10);
   s.emit('positions',allPositions());
   if(portfolio)s.emit('portfolio',portfolio);
+  s.emit('ticker',tickerOut());
   s.on('join',d=>{
     const p={id:s.id,name:clean(d&&d.name,16)||'Anon',color:COLORS.includes(d&&d.color)?d.color:COLORS[0],sprite:Math.max(0,Math.min(3,(d&&d.sprite)|0)),x:MAP.SPAWN.x,y:MAP.SPAWN.y,dir:'down'};
     p.zone=MAP.zoneAt(p.x,p.y);players[s.id]=p;

@@ -82,3 +82,7 @@ Historia portfela pochodzi z feedu: opcjonalne pole `portfolio` w `POST /api/fee
 Odczyt: `GET /api/portfolio`, Socket.IO `portfolio`. Bez historii ekran pokazuje "BRAK HISTORII" – nigdy wymyślonych liczb.
 Pola: `start, bank, realizedPnl, roiPct, trades, partial, wins, winRate, maxDrawdownPct, maxDrawdownUsd, best, worst, series[{ts,bank}], recent[{ts,kind:open|close,token,net,pct,size,partial,runner,mode}], mode, updatedAt`.
 `sync-feed.js`: `FEED_ONLY=local` + `LOCAL_FEED_URL=...` wysyła tylko do lokalnego serwera (np. :3100); domyślnie bez zmian.
+
+## Pasek wiadomości (ticker) i dymki czatu
+Na górnej ścianie przewija się pasek: wiadomości ze świata z lokalnego WorldMonitora (`WM_URL`, domyślnie `http://[::1]:3004`, endpoint `/api/news/v1/list-feed-digest`; nigdy api.worldmonitor.app) na przemian z Top 10 krypto z CoinGecko (`/api/v3/coins/markets`). Cache po stronie serwera: krypto co 60 s, wiadomości co 5 min. Odczyt: `GET /api/ticker`, Socket.IO `ticker`. Błąd = "BRAK DANYCH". `TICKER_OFF=1` wyłącza pobieranie.
+Każda wiadomość czatu (gracz lub bot, globalna lub strefowa) pokazuje nad postacią dymek (~5 s, do ~60 znaków w 2 liniach, nowa zastępuje starą).
