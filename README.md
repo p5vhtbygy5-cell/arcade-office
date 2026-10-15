@@ -1,8 +1,13 @@
-# Arcade Office – Krypto Biuro 🕹️🚀
-Wirtualne biuro multiplayer w stylu retro pixel-art (Node.js + Express + Socket.IO, klient na canvasie, bez kroku budowania).
+# Krypto Biuro – wirtualne biuro (styl Game Boy) 🎮
+Wirtualne biuro multiplayer w stylu klasycznej konsoli Game Boy (4 odcienie zieleni, kafelki 16×16, okno dialogowe na dole; cała grafika rysowana proceduralnie w kodzie) (Node.js + Express + Socket.IO, klient na canvasie, bez kroku budowania).
 
 ## Strefy
-Parkiet Tradingowy, Sala Spotkań, Chillout / Lounge, **Tablica Pozycji**, **Gabinet CHIEF** oraz **Workspace Botów** (dolne skrzydło, wejście z korytarza). Czat strefowy rozpoznaje wszystkie strefy.
+- **Open Space** – główna sala, w której pracują boty: biurka SIZE (kalkulator, waga, 3 monitory), SCAN (radar, ekrany z wykresami), BOOK (księgi, segregatory, szafa na akta), RISK (lampa alarmowa, tarcza, wskaźnik), VET (lupa, lista kontrolna, pieczątka), FILLS (terminal, drukarka biletów, dzwonek).
+- **Tablica Pozycji** – duża tablica na ścianie Open Space (obszar przed tablicą to osobna strefa czatu).
+- **Gabinet CHIEF** – prywatny gabinet z drzwiami, dużym biurkiem, telefonem, tabliczką i regałem.
+- **Łazienka** – kabiny WC, umywalki, lustra.
+- **Social** – sofy, ekspres do kawy, lodówka, rośliny, TV z konsolą, stoły.
+Czat strefowy działa we wszystkich strefach.
 
 ## Boty NPC
 Serwer wyświetla 7 botów grupy: CHIEF (we własnym gabinecie) oraz SIZE, SCAN, BOOK, RISK, VET, FILLS przy podpisanych biurkach. Każdy ma własny robotyczny sprite, animację w spoczynku i co kilka sekund dymek statusu (zdarzenie `bubble`). Na liście online są oznaczone jako [BOT]. Konfiguracja: `BOT_CFG` w `server.js`, pozycje: `BOT_DESKS` w `public/map.js`.

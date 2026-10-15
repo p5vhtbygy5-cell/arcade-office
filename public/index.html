@@ -1,38 +1,40 @@
-<!DOCTYPE html><html lang="pl"><head><meta charset="utf-8"><title>Arcade Office – Krypto Biuro</title>
+<!DOCTYPE html><html lang="pl"><head><meta charset="utf-8"><title>Krypto Biuro – wersja kieszonkowa</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-*{box-sizing:border-box}body{margin:0;background:#0a0018;color:#eee;font-family:'Press Start 2P',monospace;font-size:10px;overflow:hidden}
-#app{display:flex;height:100vh}#gamewrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative}
-canvas{image-rendering:pixelated;border:3px solid #ff2bd6;box-shadow:0 0 20px #ff2bd6,0 0 40px #00f0ff55;max-width:100%;max-height:100%}
-.crt::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px);}
-#side{width:320px;background:#12002a;border-left:3px solid #00f0ff;display:flex;flex-direction:column}
-#side h2{color:#ffe600;font-size:11px;margin:10px;text-shadow:0 0 6px #ffe600}
-#zone{margin:0 10px 8px;color:#39ff14}#tabs{display:flex;margin:0 10px}#tabs button{flex:1}
-button{font-family:inherit;font-size:9px;background:#200040;color:#00f0ff;border:2px solid #00f0ff;padding:6px;cursor:pointer}
-button.on{background:#00f0ff;color:#12002a}
-#log{flex:1;overflow-y:auto;margin:8px 10px;line-height:1.7;word-wrap:break-word}#log .sys{color:#888}#log .tag{color:#ffe600}
-#form{display:flex;margin:10px}#msg{flex:1;font-family:inherit;font-size:9px;background:#000;color:#fff;border:2px solid #ff2bd6;padding:6px}
-#plist{margin:0 10px 8px;line-height:1.7;max-height:140px;overflow-y:auto;font-size:8px}#plist .b{color:#888}#online{margin:0 10px 8px;color:#ff2bd6}
-#login{position:fixed;inset:0;background:#0a0018ee;display:flex;align-items:center;justify-content:center;z-index:9}
-#login .box{border:3px solid #ff2bd6;padding:24px;background:#12002a;box-shadow:0 0 30px #ff2bd6;text-align:center;width:420px}
-#login h1{font-size:16px;color:#ffe600;text-shadow:0 0 8px #ff2bd6;line-height:1.6}
-#login input{font-family:inherit;width:100%;padding:8px;margin:10px 0;background:#000;color:#39ff14;border:2px solid #00f0ff}
-#colors,#sprites{display:flex;gap:6px;justify-content:center;margin:8px 0}.sw{width:28px;height:28px;border:2px solid #333;cursor:pointer}.sw.on{border-color:#fff;box-shadow:0 0 8px #fff}
-#sprites canvas{border:2px solid #333;box-shadow:none;cursor:pointer}#sprites canvas.on{border-color:#fff}
-#board{display:none;position:fixed;left:20px;bottom:20px;max-width:calc(100vw - 380px);max-height:45vh;overflow:auto;background:#050010f2;border:3px solid #ffe600;box-shadow:0 0 20px #ffe600;padding:10px;z-index:5;font-size:8px}
-#board.show{display:block}#board .bh{color:#ffe600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}#board table{border-collapse:collapse;width:100%}
-#board th{color:#00f0ff;text-align:left;padding:4px 8px;border-bottom:2px solid #00f0ff}#board td{padding:4px 8px}#board tr.long td:nth-child(-n+2){color:#39ff14}#board tr.short td:nth-child(-n+2){color:#ff3b3b}
-.blink{animation:b 1s steps(2) infinite}@keyframes b{50%{opacity:0}}
+:root{--c0:#0f380f;--c1:#306230;--c2:#8bac0f;--c3:#9bbc0f}
+*{box-sizing:border-box}body{margin:0;background:var(--c0);color:var(--c0);font-family:'Press Start 2P',monospace;font-size:9px;overflow:hidden}
+#app{display:flex;height:100vh}#gamewrap{flex:1;display:flex;align-items:center;justify-content:center}
+canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+#screen{padding:10px;background:var(--c1);border-radius:8px 8px 30px 8px;box-shadow:inset 0 0 0 3px var(--c0)}
+.gb{background:var(--c3);border:4px solid var(--c0);border-radius:6px;box-shadow:inset 0 0 0 2px var(--c3),inset 0 0 0 4px var(--c1)}
+#side{width:300px;background:var(--c2);border-left:4px solid var(--c0);display:flex;flex-direction:column;padding:8px;gap:8px}
+#side .gb{padding:8px}#side h2{font-size:10px;margin:0 0 6px}
+#plist{line-height:1.8;max-height:150px;overflow-y:auto;font-size:8px}#plist .b{color:var(--c1)}
+#tabs{display:flex;gap:6px}button{font-family:inherit;font-size:8px;background:var(--c3);color:var(--c0);border:3px solid var(--c0);border-radius:4px;padding:6px;cursor:pointer}
+button.on{background:var(--c0);color:var(--c3)}button:hover{background:var(--c2)}button.on:hover{background:var(--c1)}
+#log{flex:1;overflow-y:auto;line-height:1.8;word-wrap:break-word;font-size:8px}#log .sys{color:var(--c1)}#log .tag{color:var(--c1)}#log b{font-weight:normal;text-decoration:underline}
+#form{display:flex;gap:6px}#msg{flex:1;font-family:inherit;font-size:8px;background:var(--c3);color:var(--c0);border:3px solid var(--c0);border-radius:4px;padding:6px;outline:none}
+#login{position:fixed;inset:0;background:var(--c0);display:flex;align-items:center;justify-content:center;z-index:9}
+#login .box{padding:24px;text-align:center;width:440px;line-height:1.8}#login h1{font-size:14px;line-height:1.7;margin:0 0 10px}
+#login input{font-family:inherit;width:100%;padding:8px;margin:6px 0;background:var(--c3);color:var(--c0);border:3px solid var(--c0);outline:none}
+#colors,#sprites{display:flex;gap:6px;justify-content:center;margin:6px 0;flex-wrap:wrap}
+#colors canvas,#sprites canvas{border:3px solid var(--c3);cursor:pointer;image-rendering:pixelated}#colors canvas.on,#sprites canvas.on{border-color:var(--c0)}
+.cursor::before{content:'▶ '}.blink{animation:b 1s steps(2) infinite}@keyframes b{50%{opacity:0}}
+#board{display:none;position:fixed;left:20px;bottom:20px;max-width:calc(100vw - 360px);max-height:45vh;overflow:auto;padding:12px;z-index:5;font-size:8px}
+#board.show{display:block}#board .bh{margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:20px}
+#board table{border-collapse:collapse;width:100%}#board th{text-align:left;padding:4px 8px;border-bottom:3px solid var(--c0)}#board td{padding:5px 8px;white-space:nowrap}
+#board tr.short td:nth-child(2),#board td.neg{background:var(--c0);color:var(--c3)}#board tr.long td:nth-child(2),#board td.pos{background:var(--c2)}
 </style></head><body>
-<div id="login"><div class="box"><h1>ARCADE OFFICE<br><span style="color:#00f0ff">KRYPTO BIURO</span></h1>
-<p>Wpisz ksywkę:</p><input id="nick" maxlength="16" placeholder="np. SatoshiFan">
-<p>Kolor awatara:</p><div id="colors"></div><p>Postać:</p><div id="sprites"></div>
-<button id="go" style="margin-top:12px;font-size:12px">▶ WEJDŹ</button><p class="blink" style="color:#ff2bd6;margin-top:14px">WCIŚNIJ START</p></div></div>
-<div id="app"><div id="gamewrap" class="crt"><canvas id="c" width="960" height="888"></canvas></div>
-<div id="board"><div class="bh">★ TABLICA POZYCJI ★ <button id="bclose">X</button></div><table><thead><tr><th>Symbol</th><th>Kierunek</th><th>Wielkość</th><th>Cena wejścia</th><th>Aktualna cena</th><th>PnL %</th><th>Bot</th><th>Czas otwarcia</th></tr></thead><tbody id="btbody"></tbody></table><div style="color:#666;margin-top:8px">• = cena live (Binance)</div></div>
-<div id="side"><h2>⚡ CZAT</h2><div id="zone">Strefa: -</div><div id="online">Online: 0</div><div id="plist"></div>
-<button id="tb" style="margin:0 10px 8px;color:#ffe600;border-color:#ffe600">📊 TABLICA</button><div id="tabs"><button id="tg" class="on">Globalny</button><button id="tz">Strefa</button></div>
-<div id="log"></div><form id="form"><input id="msg" maxlength="200" placeholder="Napisz… (Enter)" autocomplete="off"><button>OK</button></form>
-<div style="margin:0 10px 10px;color:#666;line-height:1.6">Ruch: strzałki / WASD<br>Enter: czat, Esc: wróć do gry</div></div></div>
+<div id="login"><div class="box gb"><h1>KRYPTO BIURO<br><small>wersja kieszonkowa</small></h1>
+<p>Jak masz na imię?</p><input id="nick" maxlength="16" placeholder="np. SatoshiFan">
+<p>Wybierz strój:</p><div id="colors"></div><p>Wybierz postać:</p><div id="sprites"></div>
+<button id="go" style="margin-top:10px;font-size:11px">▶ START</button><p class="blink" style="margin-top:10px">NACIŚNIJ START</p></div></div>
+<div id="board" class="gb"><div class="bh"><span>TABLICA POZYCJI</span><button id="bclose">X</button></div><table><thead><tr><th>Symbol</th><th>Kierunek</th><th>Wielkość</th><th>Cena wejścia</th><th>Aktualna cena</th><th>PnL %</th><th>Bot</th><th>Czas otwarcia</th></tr></thead><tbody id="btbody"></tbody></table><div style="color:var(--c1);margin-top:8px">• = cena live (Binance) · ▲ LONG · ▼ SHORT</div></div>
+<div id="app"><div id="gamewrap"><div id="screen"><canvas id="c" width="640" height="504"></canvas></div></div>
+<div id="side"><div class="gb"><h2>STATUS</h2><div id="zone">Strefa: -</div><div id="online" style="margin-top:6px">Online: 0</div></div>
+<div class="gb"><div id="plist"></div></div>
+<button id="tb">▶ TABLICA POZYCJI</button><div id="tabs"><button id="tg" class="on">Globalny</button><button id="tz">Strefa</button></div>
+<div id="log" class="gb"></div><form id="form"><input id="msg" maxlength="200" placeholder="Napisz… (Enter)" autocomplete="off"><button>OK</button></form>
+<div class="gb" style="line-height:1.7;font-size:7px">Ruch: strzałki / WASD<br>Enter: czat · Esc: gra</div></div></div>
 <script src="/socket.io/socket.io.js"></script><script src="map.js"></script><script src="game.js"></script></body></html>
