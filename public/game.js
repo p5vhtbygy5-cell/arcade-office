@@ -4,6 +4,7 @@ const C=['#1e120c','#8a4b2a','#d4a24c','#f3e6c8']; // walnut ink, copper, brass,
 // semantic accents: nixie amber, copper-red (loss/short), teal oxide (gain/long), brass highlight
 const NEON={amber:'#ff9a3c',mag:'#d9573b',cyan:'#4fb0b4',hi:'#f0cf7a'};
 const WAL=['#5a3520','#3e2414','#734628']; // walnut light/dark/hi
+const AU='#c9a24a'; // restrained gold (CHIEF office)
 const col=c=>typeof c=='string'?c:C[c];
 const COLORS=['#ff2bd6','#00f0ff','#39ff14','#ffe600','#ff6b00','#b026ff','#ffffff','#ff3b3b']; // server-side ids of "stroje"
 const ZN=Object.fromEntries(ZONES.map(z=>[z.id,z.name]));ZN.korytarz='Korytarz';
@@ -146,7 +147,21 @@ function buildMap(){const c=document.createElement('canvas');c.width=W*T;c.heigh
  box(8*T-4,20*T+3,24,9,3);tt('CHIEF',8*T-2,20*T+5);box(34*T+2,20*T+3,18,9,3);tt('WC',34*T+7,20*T+5);
  // Persian/Turkish rugs under the bot desks (static layer)
  for(const f of furniture.filter(f=>f.type=='botdesk'))rug((f.x-1)*T+4,(f.y-1)*T+6,(f.w+3)*T-8,(f.h+2)*T-6);
+ chiefDecor();
  ctxSwap(save);mapCache=c;}
+function chiefDecor(){// big Persian rug with gold border
+ rug(1*T+6,21*T+10,10*T-6,5*T-4);R(1*T+5,21*T+9,10*T-4,1,AU);R(1*T+5,26*T+6,10*T-4,1,AU);
+ // dark panelling with gold trim on the room's wall (row 20 and side wall x=12)
+ for(let x=1;x<10;x++){const X=x*T,Y=20*T;R(X,Y+3,T,10,'#3a1e0e');R(X,Y+3,T,1,AU);R(X,Y+12,T,1,AU);R(X+2,Y+5,5,5,'#2e180a');R(X+9,Y+5,5,5,'#2e180a');}
+ for(let y=21;y<27;y++){R(12*T+2,y*T,1,T,AU);R(12*T+13,y*T,1,T,AU);}
+ // gold sconces
+ for(const x of [1,4]){const X=x*T+5,Y=20*T+4;R(X+2,Y+4,2,5,AU);R(X,Y+8,6,2,AU);R(X+1,Y,4,4,'#ffd890');R(X+2,Y-1,2,1,'#fff2c0');ctx.fillStyle='rgba(255,210,120,.18)';ctx.fillRect(X-4,Y-3,14,14);}
+ // framed oil portrait
+ {const X=2*T+4,Y=20*T-6;R(X,Y,22,18,AU);R(X+1,Y+1,20,16,'#8a6a2a');R(X+2,Y+2,18,14,'#2a1a2e');ctx.fillStyle='#c9a080';ctx.fillRect(X+8,Y+4,6,6);R(X+6,Y+10,10,6,'#1a1020');R(X+10,Y+11,2,3,'#e0d0b0');R(X+8,Y+3,6,2,'#3a2a20');}
+ // vault door with gold dial
+ {const X=5*T+2,Y=20*T-6;R(X,Y,28,19,'#4a4038');R(X+1,Y+1,26,17,'#6a5e52');R(X+2,Y+2,24,15,'#585048');for(const [rx,ry] of [[3,3],[23,3],[3,14],[23,14]])R(X+rx,Y+ry,2,2,AU);
+  ctx.fillStyle=AU;ctx.beginPath();ctx.arc(X+14,Y+9,5,0,7);ctx.fill();ctx.fillStyle='#3a2a18';ctx.beginPath();ctx.arc(X+14,Y+9,2,0,7);ctx.fill();R(X+14,Y+4,1,2,'#f4dc90');R(X+21,Y+8,4,2,AU);}
+ box(8*T-4,20*T+3,24,9,AU);tt('CHIEF',8*T-2,20*T+5,0);}
 function rug(X,Y,w,h){const RED='#9e2a22',IND='#2e3a7a',GOLD='#d4a24c',CR='#f3e6c8',DK='#5a1610';
  ctx.fillStyle='rgba(20,8,2,.35)';ctx.fillRect(X+2,Y+2,w,h);
  for(let i=X+1;i<X+w-1;i+=2){R(i,Y-3,1,3,CR);R(i,Y+h,1,3,CR);} // fringes
@@ -181,17 +196,30 @@ function drawF(f,t){const X=f.x*T,Y=f.y*T,w=f.w*T,h=f.h*T;
   {const ph=(t/90|0)%12;ctx.fillStyle='rgba(243,230,200,.7)';ctx.fillRect(X+6+Math.sin(t/300)*2,Y-4-ph,3,2);ctx.fillRect(X+8-Math.sin(t/250)*2,Y-8-((ph+6)%12),2,2);}break;
  case 'copier':box(X,Y+2,w,14,2);R(X+2,Y+4,w-4,3,0);R(X+4,Y+9,8,2,3);R(X+w-8,Y+9,4,3,1);break;
  case 'bookshelf':box(X,Y-6,w,22,1);for(let r=0;r<3;r++){R(X+2,Y-4+r*7,w-4,6,0);for(let i=X+3;i<X+w-3;i+=3)R(i,Y-3+r*7,2,5,(i/3+r)%3?2:3);}break;
- case 'bigdesk':box(X,Y,w,h,WAL[2]);R(X+1,Y+1,w-2,4,'#9a6238');R(X+1,Y+h-10,w-2,1,C[2]);R(X+1,Y+h-9,w-2,8,WAL[1]);R(X+4,Y+h-6,6,1,0);R(X+w-10,Y+h-6,6,1,0);
-  // phone
-  box(X+4,Y+4,10,6,1);R(X+3,Y+3,12,2,0);R(X+6,Y+6,1,1,3);R(X+8,Y+6,1,1,3);R(X+10,Y+6,1,1,3);
-  // monitor
-  box(X+w/2-9,Y-6,18,12,0);R(X+w/2-7,Y-4,14,7,(t/800|0)%2?2:3);R(X+w/2-2,Y+6,4,2,0);
+ case 'bigdesk':box(X,Y,w,h,'#4a2614');R(X+1,Y+1,w-2,1,AU);R(X+3,Y+3,w-6,8,'#5e1a1a');R(X+3,Y+3,w-6,1,'#7a2a26');R(X+3,Y+10,w-6,1,AU);R(X+1,Y+h-10,w-2,1,AU);R(X+1,Y+h-9,w-2,8,'#32180c');
+  for(const dx of [6,w/2-4,w-14])R(X+dx,Y+h-6,8,2,AU);R(X+2,Y+h-2,2,2,AU);R(X+w-4,Y+h-2,2,2,AU);
+  // phone (black bakelite, gold dial)
+  box(X+5,Y+4,10,6,0);R(X+4,Y+3,12,2,'#2a1a10');R(X+9,Y+6,2,2,AU);
+  // gold-framed brass terminal with three nixie screens
+  box(X+w/2-20,Y-9,40,14,AU);R(X+w/2-19,Y-8,38,1,'#f0d890');for(let i=0;i<3;i++){const sx=X+w/2-17+i*12;R(sx,Y-6,10,8,'#140a05');tt(String(((t/1000|0)+i*7)%100).padStart(2,'0'),sx+2,Y-4,'#ff9a3c');}
+  R(X+w/2-2,Y+5,4,2,AU);
   // papers
-  R(X+w-16,Y+4,9,6,3);R(X+w-15,Y+5,7,1,1);R(X+w-15,Y+7,5,1,1);
+  R(X+w-17,Y+4,9,6,3);R(X+w-16,Y+5,7,1,1);R(X+w-16,Y+7,5,1,1);R(X+w-6,Y+4,2,6,AU);
   // nameplate
-  {const pw=tw('CHIEF')+8;box(X+w/2-pw/2,Y+h-12,pw,9,3);tt('CHIEF',X+w/2-pw/2+4,Y+h-10);}break;
+  {const pw=tw('CHIEF')+8;box(X+w/2-pw/2,Y+h-12,pw,9,AU);tt('CHIEF',X+w/2-pw/2+4,Y+h-10);}break;
  case 'chair2':box(X+2,Y+2,12,12,'#c8742e');R(X+4,Y+4,8,4,'#e09a52');R(X+3,Y+13,1,3,C[2]);R(X+12,Y+13,1,3,C[2]);break;
- case 'globe':R(X+7,Y+10,2,4,0);box(X+4,Y+13,8,3,1);ctx.fillStyle=C[0];ctx.beginPath();ctx.arc(X+8,Y+6,6,0,7);ctx.fill();ctx.fillStyle=C[3];ctx.beginPath();ctx.arc(X+8,Y+6,5,0,7);ctx.fill();R(X+5,Y+3,3,3,1);R(X+9,Y+7,3,2,1);break;
+ case 'goldcabinet':{box(X,Y-14,w,30,'#3a1e0e');R(X+1,Y-13,w-2,1,AU);R(X+2,Y-12,w-4,22,'rgba(200,220,230,.18)');
+  for(let r=0;r<3;r++){R(X+2,Y-4+r*7,w-4,1,AU);}for(let i=0;i<3;i++)for(let k=0;k<2-(i>1?1:0);k++){R(X+4+i*8,Y-7-k*2,6,2,'#d8b048');R(X+4+i*8,Y-7-k*2,6,1,'#f4dc90');}
+  for(let i=0;i<3;i++){R(X+4+i*8,Y+0,6,3,'#c9b98a');R(X+6+i*8,Y+0,2,3,'#7a5a3a');}for(let i=0;i<2;i++){R(X+6+i*12,Y+6,8,3,'#d8b048');R(X+7+i*12,Y+5,6,1,'#f4dc90');}
+  R(X+2,Y-12,1,22,'rgba(255,255,255,.35)');R(X+w/2,Y-12,1,22,'#3a1e0e');break;}
+ case 'decanter':box(X,Y+3,16,13,'#3a1e0e');R(X+1,Y+4,14,1,AU);R(X+3,Y-3,4,8,'rgba(150,40,30,.85)');R(X+4,Y-6,2,3,'rgba(220,230,235,.6)');R(X+3,Y-3,4,1,'rgba(255,255,255,.5)');R(X+9,Y+1,3,4,'rgba(220,230,235,.5)');R(X+12,Y+1,3,4,'rgba(220,230,235,.5)');box(X+2,Y+9,12,5,'#5e3a20');R(X+6,Y+10,4,1,AU);break;
+ case 'tickerclock':{R(X+7,Y+8,2,8,AU);box(X+3,Y+13,10,3,'#3a1e0e');ctx.fillStyle=AU;ctx.beginPath();ctx.arc(X+8,Y+5,7,0,7);ctx.fill();ctx.fillStyle='rgba(220,230,235,.35)';ctx.beginPath();ctx.arc(X+8,Y+5,5.5,0,7);ctx.fill();
+  R(X+5,Y+1,6,4,'#140a05');tt(String(new Date().getSeconds()%10),X+7,Y+1,'#ff9a3c');const tp=(t/300|0)%2;R(X+4,Y+7+tp,8,1,C[3]);R(X+4,Y+9,8,1,C[3]);break;}
+ case 'boiler':{const cx=X+w/2;box(X+4,Y-14,w-8,h+12,C[1]);R(X+5,Y-13,2,h+10,'#c87a4a');for(let j=Y-10;j<Y+h-4;j+=7){R(X+4,j,w-8,1,'#5a2a14');for(let i=X+6;i<X+w-6;i+=5)R(i,j+2,1,1,NEON.hi);}
+  ctx.fillStyle=C[1];ctx.beginPath();ctx.arc(cx,Y-14,w/2-4,Math.PI,0);ctx.fill();gauge(cx-6,Y-4,5,0.5+0.45*Math.sin(t/600));gauge(cx+7,Y+6,4,0.5+0.4*Math.sin(t/430+2));
+  gear(X+4,Y+h-6,6,8,t/400,C[2]);gear(X+w-4,Y+h-10,5,7,-t/330,'#c8742e');R(cx-1,Y-24,3,6,C[2]);R(cx-3,Y-25,7,2,NEON.mag);steam(cx,Y-26,t,.3);if(Math.sin(t/900)>0.3)steam(X+w-4,Y-6,t,.7);
+  box(X+6,Y+h-2,w-12,6,'#2a1a10');tt('KOCIOL',cx-11,Y+h-1,C[2]);break;}
+ case 'globe':R(X+7,Y+10,2,4,AU);box(X+4,Y+13,8,3,AU);ctx.fillStyle=AU;ctx.beginPath();ctx.arc(X+8,Y+6,7,0,7);ctx.fill();ctx.fillStyle=C[0];ctx.beginPath();ctx.arc(X+8,Y+6,6,0,7);ctx.fill();ctx.fillStyle=C[3];ctx.beginPath();ctx.arc(X+8,Y+6,5,0,7);ctx.fill();R(X+5,Y+3,3,3,1);R(X+9,Y+7,3,2,1);break;
  case 'stall':box(X,Y,w,h,2);R(X+1,Y+1,w-2,2,1);for(let i=1;i<4;i++)R(X+i*16,Y,1,h,0);
   // toilet visible in first open stall
   box(X+3,Y+8,10,12,3);box(X+4,Y+4,8,5,3);R(X+6,Y+12,4,5,1);box(X+19,Y+18,10,28,1);R(X+26,Y+31,2,2,3);box(X+35,Y+18,10,28,1);R(X+42,Y+31,2,2,3);
@@ -240,14 +268,25 @@ function deskDecor2(L,X,Y,w,t){const mon=(mx,my,mw,mh,anim)=>{box(mx,my,mw,mh,C[
   ctx.fillStyle=C[0];ctx.beginPath();ctx.arc(X+36,Y+6,5,Math.PI,0);ctx.fill();R(X+30,Y+6,12,2,0);R(X+35,Y-1,2,2,0);ctx.fillStyle=C[3];ctx.fillRect(X+33,Y+3,2,1);break;}}
 // ---- Skull of Satoshi (Benjamin Von Wong, 2023): e-waste/circuit-board skull with red laser eyes, on a plinth ----
 const SKULL=["....aaaaaaaa....","..aabcbbbbcbaa..",".abbbcbbbbbbcba.","abbcbbbbbbcbbbba","abcbbbbbbbbbbcba","abbeeeebbeeeebba","abbeee*bbe*eebba","abbeeeebbeeeebba",".abbbbbaabbbbba.","..abbbbeebbbbba.","..aabbbbbbbbaa..","...abdbdbdbdba..","...adbdbdbdbda..","....aaaaaaaaa..."];
-function drawSkull(X,Y,w,h,t){const px=3,sx=X+w/2-24,sy=Y-34;
- box(X+2,Y+8,w-4,h-8,WAL[2]);R(X+3,Y+9,w-6,1,C[2]);R(X+3,Y+h-5,w-6,1,C[2]);box(X+5,Y+h-14,w-10,6,C[2]);
- box(X+w/2-35,Y+h+1,70,9,C[3]);tt('SKULL OF SATOSHI',X+w/2-31,Y+h+3,0);
- const pal={a:'#2a1a10',b:'#3f6f88',c:'#c8742e',d:'#c9c2b0',e:'#140a05'};const fl=Math.random()<0.08?0.3:(0.75+0.25*Math.sin(t/90));
- SKULL.forEach((row,j)=>{for(let i=0;i<16;i++){const ch=row[i];if(ch=='.')continue;let c=pal[ch];if(ch=='*')c='rgba(255,40,30,'+fl.toFixed(2)+')';ctx.fillStyle=c;ctx.fillRect(sx+i*px,sy+j*px,px,px);
-  if(ch=='b'&&(i*7+j*3)%5==0){ctx.fillStyle='#d4a24c';ctx.fillRect(sx+i*px,sy+j*px,1,1);}}});
- ctx.fillStyle='rgba(255,40,30,'+(0.18*fl).toFixed(2)+')';ctx.fillRect(sx+3*px,sy+4*px,5*px,4*px);ctx.fillRect(sx+8*px,sy+4*px,5*px,4*px);
- if(fl>0.85){ctx.fillStyle='rgba(255,60,40,.35)';ctx.fillRect(sx+6*px+1,sy+7*px,1,14);ctx.fillRect(sx+10*px+1,sy+7*px,1,14);}}
+// Reference (Greenpeace/Von Wong 2023): e-waste circuit-board skull, smokestacks rising from the cranium, red laser eyes with bitcoin logos, cables spilling from the neck.
+function drawSkull(X,Y,w,h,t){const px=3,sx=X+w/2-24,sy=Y-30;
+ // plinth (walnut + gold) and plaque
+ box(X+2,Y+12,w-4,h-12,'#3a1e0e');R(X+3,Y+13,w-6,1,AU);R(X+3,Y+h-4,w-6,1,AU);
+ box(X+w/2-35,Y+h+1,70,9,AU);tt('SKULL OF SATOSHI',X+w/2-31,Y+h+3,0);
+ // black cable tentacles spilling from the neck over the plinth (gently swaying)
+ ctx.strokeStyle='#0c0806';ctx.lineWidth=2;for(let k=0;k<6;k++){const x0=sx+18+k*2.5,y0=sy+40,dir=k<3?-1:1,sp=Math.sin(t/700+k)*2;
+  ctx.beginPath();ctx.moveTo(x0,y0);ctx.bezierCurveTo(x0+dir*(6+k*2),y0+6+sp,x0+dir*(10+k*3),y0+10-sp,x0+dir*(8+k*4)+sp,Y+h-2);ctx.stroke();}
+ ctx.lineWidth=1;ctx.strokeStyle='#3a3a44';for(let k=0;k<6;k+=2){const x0=sx+18+k*2.5,dir=k<3?-1:1;ctx.beginPath();ctx.moveTo(x0,sy+41);ctx.lineTo(x0+dir*(6+k*2),sy+47);ctx.stroke();}
+ // smokestacks on the cranium + animated smoke
+ for(const [ox,hh,s] of [[9,16,0],[21,22,.35],[33,13,.7]]){const cx=sx+ox;R(cx-1,sy+4-hh,8,hh,'#1a1210');R(cx,sy+4-hh,6,hh,'#8a7a70');R(cx-1,sy+4-hh,8,2,'#3a2a24');R(cx+1,sy+6-hh,1,hh-4,'#b0a498');R(cx,sy+2-hh+hh/2|0,6,1,'#8a2a20');
+  for(let k=0;k<4;k++){const ph=(t/1800+k/4+s)%1;const sz=3+ph*8|0;ctx.fillStyle='rgba(205,198,190,'+(0.8*(1-ph)).toFixed(2)+')';ctx.fillRect(cx+3+Math.sin(ph*5+s*9)*4-sz/2|0,sy+2-hh-ph*26|0,sz,sz);}}
+ const pal={a:'#1a1210',b:'#2f5a6e',c:'#c8742e',d:'#c9c2b0',e:'#0a0605'};// eyes: slow smooth cycle (~4.5 s): glow up, fade to dark, repeat
+ const fl=Math.pow(0.5-0.5*Math.cos(t/4500*2*Math.PI),1.5);
+ SKULL.forEach((row,j)=>{for(let i=0;i<16;i++){const ch=row[i];if(ch=='.')continue;let c=pal[ch];if(ch=='*')c='rgb('+(40+215*fl|0)+','+(10+30*fl|0)+','+(8+22*fl|0)+')';ctx.fillStyle=c;ctx.fillRect(sx+i*px,sy+j*px,px,px);
+  if(ch=='b'){const r=(i*7+j*3)%6;if(r==0){ctx.fillStyle='#d4a24c';ctx.fillRect(sx+i*px,sy+j*px,1,1);}else if(r==3){ctx.fillStyle='#1a1a22';ctx.fillRect(sx+i*px+1,sy+j*px+1,2,1);}else if(r==4){ctx.fillStyle='#4f8aa0';ctx.fillRect(sx+i*px,sy+j*px+2,3,1);}}}});
+ // red laser eyes (bitcoin glint) + glow + beams
+ for(const ex of [sx+5*px,sx+10*px]){ctx.fillStyle='rgba(255,40,30,'+(0.25*fl).toFixed(2)+')';ctx.fillRect(ex-5,sy+5*px-3,13,11);R(ex+1,sy+5*px+1,1,4,'rgba(255,220,200,'+fl.toFixed(2)+')');R(ex,sy+5*px+2,3,1,'rgba(255,220,200,'+fl.toFixed(2)+')');}
+ if(fl>0.85){ctx.fillStyle='rgba(255,60,40,.35)';ctx.fillRect(sx+5*px+1,sy+7*px,1,14);ctx.fillRect(sx+10*px+1,sy+7*px,1,14);}}
 // ---- positions board ----
 function fmtP(v){v=+v;return v>=1000?v.toFixed(0):v>=1?v.toFixed(2):v.toPrecision(3);}
 function pnl(p){const b=p.desk?p.pnlBase:p.entry;if(!b)return NaN;const c=p.price??b;return (c-b)/b*100*(p.side=='LONG'?1:-1);}
