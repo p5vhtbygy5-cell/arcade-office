@@ -77,5 +77,5 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  chk(fev.some(([e,d])=>e=='positionClosed'&&d=='feed-T-1')&&fev.some(([e,d])=>e=='bubble'&&d.id=='bot-RISK'&&/Zamykam TFEED \(PAPIER\)/.test(d.text)),'Zamknięcie ogłoszone (PAPIER)');
  const gf=await fetch(F).then(r=>r.json());chk(gf.lastFeedAt&&gf.activity.length==3&&gf.positions.length==0,'GET /api/feed');
  fc.disconnect();}finally{srv.kill();}
-chk(require('./public/map.js').zoneAt(20*16,25.5*16)=='top10','Strefa Top 10 Krypto przy tablicy');
+chk(require('./public/map.js').zoneAt(6*16,6.5*16)=='top10','Strefa Top 10 Krypto przy tablicy');
 b.disconnect();await wait(200);chk(got.a.some(([e])=>e=='playerLeft'),'A widzi wyjście B');a.disconnect();process.exit(ok?0:1);})();

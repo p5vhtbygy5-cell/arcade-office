@@ -75,3 +75,10 @@ Uwaga (Render free): dysk jest efemeryczny – `positions.json` znika przy redep
 
 ## Feed z desku (`POST /api/feed`)
 Pełny stan desku (pozycje REAL/SHADOW, aktywność botów, opcjonalnie top10) – kontrakt w `/workspace/desk/OFFICE_FEED.md`. Pozycje SHADOW oznaczone „P:” / „[PAPIER]”, `entry=null` → PnL względem `refPrice`. `GET /api/feed` – ostatni stan i aktywność. Synchronizacja z boxa: `nohup ./sync-feed-watchdog.sh >/dev/null 2>&1 &` (log `sync.log`, `node sync-feed.js --dry` – podgląd).
+
+## Ekrany na ścianie Open Space
+Trzy duże ekrany (mosiądz/nixie): **Top 10 desk + ostatnie pozycje** (lewy), **Tablica Pozycji** (środek), **Historia portfela** (prawy).
+Historia portfela pochodzi z feedu: opcjonalne pole `portfolio` w `POST /api/feed` (budowane przez `sync-feed.js` z `/workspace/desk/trades.jsonl` i `state.json`, tylko odczyt).
+Odczyt: `GET /api/portfolio`, Socket.IO `portfolio`. Bez historii ekran pokazuje "BRAK HISTORII" – nigdy wymyślonych liczb.
+Pola: `start, bank, realizedPnl, roiPct, trades, partial, wins, winRate, maxDrawdownPct, maxDrawdownUsd, best, worst, series[{ts,bank}], recent[{ts,kind:open|close,token,net,pct,size,partial,runner,mode}], mode, updatedAt`.
+`sync-feed.js`: `FEED_ONLY=local` + `LOCAL_FEED_URL=...` wysyła tylko do lokalnego serwera (np. :3100); domyślnie bez zmian.

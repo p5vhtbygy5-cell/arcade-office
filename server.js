@@ -93,7 +93,13 @@ function readDesk(){try{const m=fs.statSync(DESK_BOARD).mtimeMs;if(m===deskMtime
 readDesk();setInterval(readDesk,15000);
 app.get('/api/top10',(q,r)=>r.json(deskTop10()||top10));
 // ---- POST /api/feed: desk state pushed by sync-feed.js (contract: /workspace/desk/OFFICE_FEED.md) ----
-let lastFeedAt=0;const feedSeen=new Set(),feedActivity=[];
+let lastFeedAt=0;let portfolio=null; // portfolio history from the feed (optional field, real desk data only)
+const fin=v=>typeof v=='number'&&isFinite(v)?v:null,str=(v,n=40)=>v==null?null:String(v).replace(/[<>]/g,'').slice(0,n);
+function cleanPortfolio(p){if(!p||typeof p!=='object')return null;const tr=t=>t&&typeof t=='object'?{token:str(t.token,24),net:fin(t.net),pct:fin(t.pct),closed:str(t.closed),partial:!!t.partial}:null;
+  return {start:fin(p.start)??1000,bank:fin(p.bank),realizedPnl:fin(p.realizedPnl),roiPct:fin(p.roiPct),trades:Math.max(0,fin(p.trades)|0),partial:Math.max(0,fin(p.partial)|0),wins:Math.max(0,fin(p.wins)|0),
+   winRate:fin(p.winRate),maxDrawdownPct:fin(p.maxDrawdownPct),maxDrawdownUsd:fin(p.maxDrawdownUsd),best:tr(p.best),worst:tr(p.worst),mode:str(p.mode,8),updatedAt:str(p.updatedAt),receivedAt:Date.now(),
+   series:(Array.isArray(p.series)?p.series:[]).slice(-500).map(x=>({ts:Date.parse(x&&x.ts)||null,bank:fin(x&&x.bank)})).filter(x=>x.ts&&x.bank!=null),
+   recent:(Array.isArray(p.recent)?p.recent:[]).slice(0,10).map(x=>({ts:Date.parse(x&&x.ts)||null,kind:x&&x.kind=='close'?'close':'open',token:str(x&&x.token,24),net:fin(x&&x.net),pct:fin(x&&x.pct),size:fin(x&&x.size),partial:!!(x&&x.partial),runner:!!(x&&x.runner),mode:str(x&&x.mode,8)})).filter(x=>x.token)};}const feedSeen=new Set(),feedActivity=[];
 const FEED_KIND_BOT={scan:'SCAN',vet:'VET',book:'BOOK',size:'SIZE',fills:'FILLS',risk:'RISK',chief:'CHIEF'};
 function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['body: obiekt JSON']};
   const ps=b.positions,acts=b.activity??[];if(!Array.isArray(ps))errs.push('positions: tablica');if(!Array.isArray(acts))errs.push('activity: tablica');
@@ -122,13 +128,16 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   const announce=first?fresh.slice(-3):fresh.slice(-6);res.activity=fresh.length;
   announce.forEach((a,i)=>setTimeout(()=>{io.emit('chat',{system:true,text:`🤖 ${a.bot}: ${a.text}`,scope:'global',ts:Date.now()});io.emit('bubble',{id:'bot-'+a.bot,text:a.text});bots.nudge(a.bot);},i*2500));
   if(b.top10&&Array.isArray(b.top10)&&b.top10.length){desk={...(desk||{}),top10:b.top10.slice(0,10),top10_cycle_ts:b.top10_cycle_ts,top10_rule:b.top10_rule,updatedAt:b.updatedAt};const t=deskTop10();if(t)io.emit('top10',t);}
+  if(b.portfolio!==undefined){const pf=cleanPortfolio(b.portfolio);if(pf){portfolio=pf;io.emit('portfolio',portfolio);}}
   return res;}
 app.post('/api/feed',auth,(q,r)=>{const res=applyFeed(q.body);if(res.error)return r.status(400).json({error:'Błędne dane',details:res.error});r.json({ok:true,...res});});
 app.get('/api/feed',(q,r)=>r.json({lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:feedActivity.slice(-30)}));
+app.get('/api/portfolio',(q,r)=>r.json(portfolio||{empty:true,trades:0,series:[],recent:[],note:'brak historii portfela (feed jeszcze nie przysłał danych)'}));
 app.get('/api/desk',(q,r)=>r.json(desk||{error:'brak board.json'}));
 io.on('connection',s=>{
   s.emit('top10',deskTop10()||top10);
   s.emit('positions',allPositions());
+  if(portfolio)s.emit('portfolio',portfolio);
   s.on('join',d=>{
     const p={id:s.id,name:clean(d&&d.name,16)||'Anon',color:COLORS.includes(d&&d.color)?d.color:COLORS[0],sprite:Math.max(0,Math.min(3,(d&&d.sprite)|0)),x:MAP.SPAWN.x,y:MAP.SPAWN.y,dir:'down'};
     p.zone=MAP.zoneAt(p.x,p.y);players[s.id]=p;
