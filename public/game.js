@@ -269,10 +269,12 @@ function deskDecor2(L,X,Y,w,t){const mon=(mx,my,mw,mh,anim)=>{box(mx,my,mw,mh,C[
 // ---- Skull of Satoshi (Benjamin Von Wong, 2023): e-waste/circuit-board skull with red laser eyes, on a plinth ----
 const SKULL=["....aaaaaaaa....","..aabcbbbbcbaa..",".abbbcbbbbbbcba.","abbcbbbbbbcbbbba","abcbbbbbbbbbbcba","abbeeeebbeeeebba","abbeee*bbe*eebba","abbeeeebbeeeebba",".abbbbbaabbbbba.","..abbbbeebbbbba.","..aabbbbbbbbaa..","...abdbdbdbdba..","...adbdbdbdbda..","....aaaaaaaaa..."];
 // Reference (Greenpeace/Von Wong 2023): e-waste circuit-board skull, smokestacks rising from the cranium, red laser eyes with bitcoin logos, cables spilling from the neck.
-function drawSkull(X,Y,w,h,t){const px=3,sx=X+w/2-24,sy=Y-30;
+function drawSkull(X,Y,w,h,t){const S=0.7;ctx.save();ctx.translate(X+7,Y+h);ctx.scale(S,S);ctx.translate(-X,-(Y+h));drawSkull0(X,Y,w,h,t);ctx.restore();
+ box(X,Y+h+1,66,9,AU);tt('SKULL OF SATOSHI',X+2,Y+h+3,0);} // plaque unscaled for readability
+function drawSkull0(X,Y,w,h,t){const px=3,sx=X+w/2-24,sy=Y-30;
  // plinth (walnut + gold) and plaque
  box(X+2,Y+12,w-4,h-12,'#3a1e0e');R(X+3,Y+13,w-6,1,AU);R(X+3,Y+h-4,w-6,1,AU);
- box(X+w/2-35,Y+h+1,70,9,AU);tt('SKULL OF SATOSHI',X+w/2-31,Y+h+3,0);
+ 
  // black cable tentacles spilling from the neck over the plinth (gently swaying)
  ctx.strokeStyle='#0c0806';ctx.lineWidth=2;for(let k=0;k<6;k++){const x0=sx+18+k*2.5,y0=sy+40,dir=k<3?-1:1,sp=Math.sin(t/700+k)*2;
   ctx.beginPath();ctx.moveTo(x0,y0);ctx.bezierCurveTo(x0+dir*(6+k*2),y0+6+sp,x0+dir*(10+k*3),y0+10-sp,x0+dir*(8+k*4)+sp,Y+h-2);ctx.stroke();}

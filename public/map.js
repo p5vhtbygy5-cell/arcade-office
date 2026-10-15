@@ -34,8 +34,8 @@ add('copier',1,13,2,1);add('watercooler',38,13);
 // steampunk machinery + the Skull of Satoshi statue (lounge corner, right side of Open Space)
 add('steamengine',1,15,2,2);add('clockwork',35,10,3,2);add('boiler',34,16,2,2);
 // --- Gabinet CHIEF (bottom-left) ---
-add('goldcabinet',1,21,2,1);add('bigdesk',4,22,5,2,{label:'CHIEF'});add('decanter',11,21);add('tickerclock',11,23);add('chair2',1,24);add('globe',11,25);add('plant',1,26);
-add('skull',8,24,2,2); // Skull of Satoshi – centrepiece of the CHIEF office
+add('goldcabinet',1,21,2,1);add('bigdesk',4,22,5,2,{label:'CHIEF'});add('decanter',11,21);add('tickerclock',11,23);add('chair2',9,24);add('globe',11,25);add('plant',10,26);add('plant',1,23);
+add('skull',1,25,2,2); // Skull of Satoshi – centrepiece of the CHIEF office
 BOT_DESKS.unshift({name:'CHIEF',x:6.5*T,y:21.5*T});
 // --- Socjal (bottom-middle) ---
 add('fridge',13,21,1,2);add('coffee',16,21);add('plant',13,26);
