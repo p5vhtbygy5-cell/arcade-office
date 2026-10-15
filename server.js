@@ -55,9 +55,9 @@ function close(q,r){const p=positions[q.params.id];if(!p)return r.status(404).js
 app.delete('/api/positions/:id',auth,close);app.post('/api/positions/:id/close',auth,close);
 // live prices from Binance public ticker (every 30s); falls back to bot price
 async function refreshPrices(){const ps=Object.values(positions);if(!ps.length||process.env.LIVE_PRICES==='0')return;
-  try{const res=await fetch('https://api.binance.com/api/v3/ticker/price',{signal:AbortSignal.timeout(8000)});if(!res.ok)return;const m={};for(const t of await res.json())m[t.symbol]=+t.price;
+  try{const syms=[...new Set(ps.flatMap(p=>{const s=String(p.symbol||'').toUpperCase();return /^[A-Z0-9]{2,12}$/.test(s)?[s.endsWith('USDT')?s:s+'USDT']:[];}))];if(!syms.length)return;const res=await fetch('https://api.binance.com/api/v3/ticker/price?symbols='+encodeURIComponent(JSON.stringify(syms)),{signal:AbortSignal.timeout(8000)});if(!res.ok)return;const m={};for(const t of await res.json())m[t.symbol]=+t.price;
     for(const p of ps){const v=m[p.symbol]??m[p.symbol+'USDT'];if(v&&p.priceSource!=='bot-locked'){if(p.price!==v){p.price=v;p.priceSource='live';io.emit('position',p);}}}save();}catch{}}
-setInterval(refreshPrices,30000);setTimeout(refreshPrices,3000);
+setInterval(refreshPrices,120000); // only our symbols, every 2 min (data saving)setTimeout(refreshPrices,3000);
 // ---- Top 10 Krypto (CoinGecko -> CoinPaprika -> CoinLore fallback, cached) ----
 const TOP10_MS=Math.max(120000,+process.env.TOP10_INTERVAL_MS||180000);
 let top10={updatedAt:null,source:null,items:[],error:'brak danych'};let top10Backoff=0;
@@ -80,7 +80,7 @@ setInterval(refreshTop10,TOP10_MS);setTimeout(refreshTop10,process.env.TOP10_MOC
 // ---- Ticker (marquee on the top wall): world news from the local WorldMonitor + CoinGecko top 10, cached server-side ----
 // News: local WorldMonitor only (never api.worldmonitor.app). Crypto: CoinGecko public markets endpoint. Read-only GET /api/ticker.
 const WM_URL=(process.env.WM_URL||'http://[::1]:3004').replace(/\/$/,'');if(/worldmonitor\.app/i.test(WM_URL))throw new Error('WM_URL musi wskazywać lokalny WorldMonitor');
-const NEWS_MS=5*60000,CRYPTO_MS=60000,NEWS_CATS=['politics','us','europe','middleeast','asia','intel','finance','energy','africa','latam','ai','tech'];
+const NEWS_MS=5*60000,CRYPTO_MS=180000,NEWS_CATS=['politics','us','europe','middleeast','asia','intel','finance','energy','africa','latam','ai','tech'];
 const ticker={news:{items:[],updatedAt:null,error:'brak danych',source:WM_URL},crypto:{items:[],updatedAt:null,error:'brak danych',source:'CoinGecko'}};
 let feedNews=null; // optional 'news' from the desk feed (box reads the local WorldMonitor) – used when our own WM fetch fails/is absent (e.g. on Render)
 const tickerOut=()=>({news:(!ticker.news.error&&ticker.news.items.length)||!feedNews?ticker.news:{...feedNews,note:'z feedu desku ('+ticker.news.error+')'},crypto:ticker.crypto});
@@ -90,7 +90,7 @@ async function refreshNews(){try{const j=await getJSON(WM_URL+'/api/news/v1/list
   all.sort((a,b)=>b.score-a.score||(b.publishedAt||0)-(a.publishedAt||0));const items=all.slice(0,15);if(!items.length)throw new Error('pusta lista');
   ticker.news={items,updatedAt:Date.now(),error:null,source:WM_URL};}
  catch(e){ticker.news={...ticker.news,error:'WorldMonitor: '+e.message};}io.emit('ticker',tickerOut());}
-async function refreshCrypto(){try{const items=(await getJSON('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10'))
+async function refreshCrypto(){try{if(top10.items&&top10.items.length>=5&&top10.source!=='mock'&&Date.now()-(top10.updatedAt||0)<300000){ticker.crypto={items:top10.items,updatedAt:top10.updatedAt,error:null,source:top10.source};io.emit('ticker',tickerOut());return;}const items=(await getJSON('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10'))
    .map(c=>({rank:c.market_cap_rank,symbol:String(c.symbol).toUpperCase(),name:c.name,price:c.current_price,change24h:c.price_change_percentage_24h,marketCap:c.market_cap})).filter(c=>c.symbol&&isFinite(c.price));
   if(!items.length)throw new Error('pusta lista');ticker.crypto={items,updatedAt:Date.now(),error:null,source:'CoinGecko'};}
  catch(e){ticker.crypto={...ticker.crypto,error:'CoinGecko: '+e.message};}io.emit('ticker',tickerOut());}
