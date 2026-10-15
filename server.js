@@ -1,7 +1,7 @@
 const express=require('express'),http=require('http'),{Server}=require('socket.io'),path=require('path');
 const MAP=require('./public/map.js');
 const app=express(),srv=http.createServer(app),io=new Server(srv);
-app.use(express.json({limit:'20kb'}));
+app.use(express.json({limit:'200kb'}));
 app.use(express.static(path.join(__dirname,'public')));
 app.get('/health',(q,r)=>r.json({ok:true,players:Object.values(players).filter(p=>!p.bot).length,bots:Object.values(players).filter(p=>p.bot).length}));
 const players={};const COLORS=['#ff2bd6','#00f0ff','#39ff14','#ffe600','#ff6b00','#b026ff','#ffffff','#ff3b3b'];
@@ -80,11 +80,11 @@ setInterval(refreshTop10,TOP10_MS);setTimeout(refreshTop10,process.env.TOP10_MOC
 // ---- Desk feed: /workspace/desk/board.json written by desk main.py (state.json + ledger) ----
 const DESK_BOARD=process.env.DESK_BOARD_FILE||'/workspace/desk/board.json';let desk=null,deskMtime=0;
 function deskPosition(){const p=desk&&desk.position;if(!p)return null;const hb=p.latest_heartbeat||{};const ref=p.entry_priceUSD??p.reference_priceUSD??null;
-  return {id:'desk-'+String(p.order_id).replace(/[^A-Za-z0-9_-]/g,''),desk:true,bot:'RISK',symbol:String(p.token),side:'LONG',size:p.ticket_usd,sizeUsd:p.ticket_usd,
+  return {id:'desk-'+String(p.order_id).replace(/[^A-Za-z0-9_-]/g,''),desk:true,mode:(desk.shadow||p.virtual)?'SHADOW':'REAL',bot:'RISK',symbol:String(p.token),side:'LONG',size:p.ticket_usd,sizeUsd:p.ticket_usd,
     entry:p.entry_priceUSD,ref:p.reference_priceUSD,refSource:p.reference_source,price:hb.priceUSD??null,priceTs:hb.ts||null,priceSource:'desk-heartbeat',
     pnlBase:ref,movePct:p.move_vs_ref_pct,chain:p.chain,orderId:p.order_id,risk:p.risk_status,
     note:`${p.chain} · order ${p.order_id} · entry ${p.entry_priceUSD??'brak'} · ref ${p.reference_priceUSD??'-'} · ${p.risk_status}`,openedAt:Date.parse(p.ts)||Date.now(),updatedAt:Date.parse(desk.updatedAt)||Date.now()};}
-const allPositions=()=>{const d=deskPosition();return d?[d,...Object.values(positions)]:Object.values(positions);};
+const allPositions=()=>{const d=Date.now()-lastFeedAt<15*60000?null:deskPosition();return d?[d,...Object.values(positions)]:Object.values(positions);};
 function deskTop10(){if(!desk||!Array.isArray(desk.top10)||!desk.top10.length)return null;
   return {updatedAt:Date.parse(desk.top10_cycle_ts||desk.updatedAt)||Date.now(),source:'desk',rule:desk.top10_rule,
     items:desk.top10.map((c,i)=>({rank:i+1,symbol:String(c.ticker),name:c.chain,chain:c.chain,price:c.priceUSD,marketCap:c.marketCap,liquidity:c.liquidity,change1h:c.change_1h,change24h:c.change_1h,stage:c.stage,reason:c.reason}))};}
@@ -92,6 +92,39 @@ function readDesk(){try{const m=fs.statSync(DESK_BOARD).mtimeMs;if(m===deskMtime
   io.emit('positions',allPositions());const t=deskTop10();if(t)io.emit('top10',t);}catch{}}
 readDesk();setInterval(readDesk,15000);
 app.get('/api/top10',(q,r)=>r.json(deskTop10()||top10));
+// ---- POST /api/feed: desk state pushed by sync-feed.js (contract: /workspace/desk/OFFICE_FEED.md) ----
+let lastFeedAt=0;const feedSeen=new Set(),feedActivity=[];
+const FEED_KIND_BOT={scan:'SCAN',vet:'VET',book:'BOOK',size:'SIZE',fills:'FILLS',risk:'RISK',chief:'CHIEF'};
+function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['body: obiekt JSON']};
+  const ps=b.positions,acts=b.activity??[];if(!Array.isArray(ps))errs.push('positions: tablica');if(!Array.isArray(acts))errs.push('activity: tablica');
+  const clean=[];if(Array.isArray(ps))ps.slice(0,50).forEach((p,i)=>{const e=[];const id=String(p&&p.id||'');if(!/^[A-Za-z0-9_.:-]{1,80}$/.test(id))e.push('id');
+    const bot=String(p.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))e.push('bot');const symbol=String(p.symbol||'').toUpperCase().replace(/[^A-Z0-9_.-]/g,'').slice(0,20);if(!symbol)e.push('symbol');
+    const side=String(p.side||'LONG').toUpperCase();if(!['LONG','SHORT'].includes(side))e.push('side');const mode=String(p.mode||'SHADOW').toUpperCase();if(!['REAL','SHADOW'].includes(mode))e.push('mode');
+    const size=p.size==null?null:pos(p.size),entry=p.entry==null?null:pos(p.entry),price=p.price==null?null:pos(p.price),ref=p.refPrice==null?null:pos(p.refPrice);
+    if(p.size!=null&&size==null)e.push('size');if(p.entry!=null&&entry==null)e.push('entry');if(p.price!=null&&price==null)e.push('price');if(p.refPrice!=null&&ref==null)e.push('refPrice');
+    if(e.length)return errs.push(`positions[${i}]: `+e.join(','));
+    clean.push({id:'feed-'+id.replace(/[^A-Za-z0-9_-]/g,'_'),feedId:id,feed:true,desk:true,bot,symbol,side,mode,size,sizeUsd:size,entry,ref,pnlBase:entry??ref,price,
+      chain:p.chain?String(p.chain).slice(0,20):null,status:p.status?String(p.status).replace(/[<>]/g,'').slice(0,200):'',note:[p.chain,mode=='SHADOW'?'PAPIER':'REAL',p.status].filter(Boolean).join(' · ').replace(/[<>]/g,'').slice(0,200),
+      openedAt:Date.parse(p.openedAt)||Date.now(),updatedAt:Date.now(),priceSource:'desk'});});
+  if(errs.length)return {error:errs};
+  lastFeedAt=Date.now();const res={opened:[],updated:[],closed:[],activity:0};const ids=new Set(clean.map(p=>p.id));
+  for(const p of clean){const old=positions[p.id];positions[p.id]=p;io.emit('position',p);
+    if(!old){res.opened.push(p.id);botSay(p.bot,`Otwieram ${p.side} ${p.symbol}${p.mode=='SHADOW'?' (PAPIER)':''}`);bots.onPosition('open',p);}else res.updated.push(p.id);}
+  for(const p of Object.values(positions))if(p.feed&&!ids.has(p.id)){delete positions[p.id];io.emit('positionClosed',p.id);res.closed.push(p.id);
+    const b=p.pnlBase,pl=b&&p.price?(p.price-b)/b*100*(p.side==='LONG'?1:-1):null;botSay(p.bot,`Zamykam ${p.symbol}${p.mode=='SHADOW'?' (PAPIER)':''}${pl!=null?` (${pl>=0?'+':''}${pl.toFixed(2)}%)`:''}`);bots.onPosition('close',p);}
+  save();io.emit('positions',allPositions());
+  // activity -> chat + bubbles (+ errand when the bot is idle); first feed only marks history as seen
+  const first=feedSeen.size===0;const fresh=[];
+  for(const a of (Array.isArray(acts)?acts.slice(-100):[])){if(!a)continue;const bot=String(a.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))continue;
+    const text=String(a.text||'').replace(/[<>]/g,'').slice(0,160);if(!text)continue;const ts=String(a.ts||'');const k=ts+'|'+bot+'|'+text;if(feedSeen.has(k))continue;feedSeen.add(k);
+    const item={ts,bot,text,kind:String(a.kind||'').slice(0,40)};feedActivity.push(item);fresh.push(item);}
+  while(feedActivity.length>100)feedActivity.shift();if(feedSeen.size>5000)feedSeen.clear();
+  const announce=first?fresh.slice(-3):fresh.slice(-6);res.activity=fresh.length;
+  announce.forEach((a,i)=>setTimeout(()=>{io.emit('chat',{system:true,text:`🤖 ${a.bot}: ${a.text}`,scope:'global',ts:Date.now()});io.emit('bubble',{id:'bot-'+a.bot,text:a.text});bots.nudge(a.bot);},i*2500));
+  if(b.top10&&Array.isArray(b.top10)&&b.top10.length){desk={...(desk||{}),top10:b.top10.slice(0,10),top10_cycle_ts:b.top10_cycle_ts,top10_rule:b.top10_rule,updatedAt:b.updatedAt};const t=deskTop10();if(t)io.emit('top10',t);}
+  return res;}
+app.post('/api/feed',auth,(q,r)=>{const res=applyFeed(q.body);if(res.error)return r.status(400).json({error:'Błędne dane',details:res.error});r.json({ok:true,...res});});
+app.get('/api/feed',(q,r)=>r.json({lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:feedActivity.slice(-30)}));
 app.get('/api/desk',(q,r)=>r.json(desk||{error:'brak board.json'}));
 io.on('connection',s=>{
   s.emit('top10',deskTop10()||top10);

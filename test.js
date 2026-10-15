@@ -58,6 +58,24 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  let allHome=false;for(let i=0;i<120&&!allHome;i++){await wait(250);const l=await lst();allHome=[...left].every(n=>{const b=l.find(x=>x.name==n);return b.atDesk||(b.tile[0]==b.home[0]&&b.tile[1]==b.home[1]);});}
  chk(left.size>0&&allHome,'Boty wracają do biurek ('+[...left].join(',')+')');
  const fin=await lst();chk(fin.length==7&&fin.every(b=>b.status&&M2.solid[b.tile[1]][b.tile[0]]===0),'Nadal 7 botów, każdy ze statusem');
- bc.disconnect();}finally{srv.kill();}
+ bc.disconnect();
+ // ---- /api/feed ----
+ const F='http://localhost:3999/api/feed',fp=(b,h=tok)=>fetch(F,{method:'POST',headers:h,body:JSON.stringify(b)}).then(async r=>({s:r.status,j:await r.json()}));
+ const fc=io('http://localhost:3999');const fev=[];fc.onAny((e,d)=>fev.push([e,d]));await new Promise(r=>fc.on('connect',r));
+ const P1={id:'T-1',bot:'RISK',symbol:'TFEED',chain:'solana',side:'LONG',size:200,entry:null,price:0.002,refPrice:0.001,mode:'SHADOW',openedAt:'2026-10-15T16:10:33+02:00',status:'OPEN (shadow)'};
+ let fr=await fp({positions:[P1],activity:[]},{'content-type':'application/json'});chk(fr.s==401,'POST /api/feed bez tokenu -> 401');
+ fr=await fp({positions:[{id:'x',bot:'NOPE',symbol:''}]});chk(fr.s==400&&fr.j.details.length,'POST /api/feed walidacja -> 400');
+ const A=[{ts:'2026-10-15T19:00:00+02:00',bot:'SCAN',text:'Skan: 200 tokenów',kind:'scan.batch'},{ts:'2026-10-15T19:01:00+02:00',bot:'VET',text:'Odrzucam X',kind:'soft.reject'}];
+ fr=await fp({updatedAt:'2026-10-15T19:40:00+02:00',positions:[P1],activity:A});chk(fr.s==200&&fr.j.opened.length==1&&fr.j.activity==2,'Feed: otwiera pozycję SHADOW i przyjmuje aktywność');
+ let fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());const fpz=fl.find(p=>p.feedId=='T-1');
+ chk(fpz&&fpz.mode=='SHADOW'&&fpz.entry===null&&fpz.pnlBase==0.001&&fpz.desk,'Pozycja z feedu: mode SHADOW, entry null, PnL liczony od refPrice');
+ fr=await fp({positions:[{...P1,price:0.003}],activity:A});chk(fr.s==200&&fr.j.updated.length==1&&fr.j.opened.length==0&&fr.j.activity==0,'Feed: aktualizacja ceny + deduplikacja aktywności');
+ fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());chk(fl.find(p=>p.feedId=='T-1').price==0.003,'Cena zaktualizowana');
+ await wait(5500);chk(fev.some(([e,d])=>e=='chat'&&d.system&&/SCAN: Skan: 200/.test(d.text))&&fev.some(([e,d])=>e=='bubble'&&d.id=='bot-VET'&&d.text=='Odrzucam X'),'Aktywność -> czat + dymki botów');
+ fr=await fp({positions:[],activity:[...A,{ts:'2026-10-15T19:05:00+02:00',bot:'BOOK',text:'Wybieram Y',kind:'pick'}]});
+ chk(fr.s==200&&fr.j.closed.length==1&&fr.j.activity==1,'Feed: brakująca pozycja zamknięta, nowa aktywność');await wait(300);
+ chk(fev.some(([e,d])=>e=='positionClosed'&&d=='feed-T-1')&&fev.some(([e,d])=>e=='bubble'&&d.id=='bot-RISK'&&/Zamykam TFEED \(PAPIER\)/.test(d.text)),'Zamknięcie ogłoszone (PAPIER)');
+ const gf=await fetch(F).then(r=>r.json());chk(gf.lastFeedAt&&gf.activity.length==3&&gf.positions.length==0,'GET /api/feed');
+ fc.disconnect();}finally{srv.kill();}
 chk(require('./public/map.js').zoneAt(28*16,25.5*16)=='top10','Strefa Top 10 Krypto przy tablicy');
 b.disconnect();await wait(200);chk(got.a.some(([e])=>e=='playerLeft'),'A widzi wyjście B');a.disconnect();process.exit(ok?0:1);})();

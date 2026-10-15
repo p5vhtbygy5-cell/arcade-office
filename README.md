@@ -72,3 +72,6 @@ Odpowiedzi: 201 (nowa), 200 (OK), 400 (`details` z listą błędów), 401 (brak/
 Uwaga (Render free): dysk jest efemeryczny – `positions.json` znika przy redeployu. Do trwałego zapisu użyj Persistent Disk i `POSITIONS_FILE=/data/positions.json`.
 
 `./ss-positions.sh add|del` – dodaje/usuwa pozycje TEST (tylko do zrzutów ekranu).
+
+## Feed z desku (`POST /api/feed`)
+Pełny stan desku (pozycje REAL/SHADOW, aktywność botów, opcjonalnie top10) – kontrakt w `/workspace/desk/OFFICE_FEED.md`. Pozycje SHADOW oznaczone „P:” / „[PAPIER]”, `entry=null` → PnL względem `refPrice`. `GET /api/feed` – ostatni stan i aktywność. Synchronizacja z boxa: `nohup ./sync-feed-watchdog.sh >/dev/null 2>&1 &` (log `sync.log`, `node sync-feed.js --dry` – podgląd).

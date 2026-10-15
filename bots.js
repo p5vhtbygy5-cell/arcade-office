@@ -82,4 +82,5 @@ setInterval(()=>{const idle=Object.values(B).filter(b=>!b.plan.length&&!b.step&&
  if(!idle.length||away()>=2||!chance(FAST?.8:.35))return;errand(rnd(idle));},ms(3000));
 // desk chatter: thinking bubbles / role lines for bots at desks
 setInterval(()=>{const at=Object.values(B).filter(b=>atHome(b)&&!b.step);if(!at.length)return;const b=rnd(at);say(b,chance(.4)?'...':rnd(BOT_CFG[b.name].lines));},ms(6000));
-return {onPosition,list:()=>Object.values(B).map(b=>({name:b.name,x:b.p.x,y:b.p.y,tile:tileOf(b),home:b.home,atDesk:atHome(b)&&!b.step&&!b.plan.length,status:b.p.status,act:b.p.act,carry:b.p.carry,zone:MAP.zoneAt(b.p.x,b.p.y)})),walk,errandFor:n=>errand(B[n])};};
+function nudge(n){const b=B[n];if(b&&!b.plan.length&&!b.step&&atHome(b)&&away()<2&&chance(.5))errand(b);}
+return {onPosition,nudge,list:()=>Object.values(B).map(b=>({name:b.name,x:b.p.x,y:b.p.y,tile:tileOf(b),home:b.home,atDesk:atHome(b)&&!b.step&&!b.plan.length,status:b.p.status,act:b.p.act,carry:b.p.carry,zone:MAP.zoneAt(b.p.x,b.p.y)})),walk,errandFor:n=>errand(B[n])};};

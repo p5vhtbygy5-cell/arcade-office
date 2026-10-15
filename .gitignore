@@ -5,3 +5,5 @@ npm-debug.log*
 positions.json
 positions.json.tmp
 .bot-token
+sync.log
+sync-feed.pid

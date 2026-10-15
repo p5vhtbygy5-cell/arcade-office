@@ -197,8 +197,8 @@ function drawScoreboard(X,Y,w,h,t){box(X-2,Y-2,w+4,h+4,1);box(X,Y,w,h,0);R(X+1,Y
  const cols=[5,46,78,114,150,184];['SYMBOL','KIER','CENA','AKT','PNL%','BOT'].forEach((c,i)=>tt(c,X+cols[i],Y+13,2));R(X+4,Y+19,w-8,1,1);
  const ps=Object.values(positions);if(!ps.length){if((t/600|0)%2)tt('BRAK OTWARTYCH POZYCJI',X+w/2-tw('BRAK OTWARTYCH POZYCJI')/2,Y+36,3);return;}
  ps.sort((a,b)=>b.openedAt-a.openedAt).slice(0,6).forEach((p,i)=>{const yy=Y+22+i*7,pl=pnl(p);
-  [p.symbol.slice(0,10),(p.side=='LONG'?'▲':'▼')+p.side,p.entry!=null?fmtP(p.entry):(p.ref!=null?'~'+fmtP(p.ref):'-'),p.price!=null?fmtP(p.price):'-',pctS(pl),p.bot].forEach((v,j)=>tt(String(v),X+cols[j],yy,j==1&&p.side=='SHORT'||j==4&&pl<0?2:3));});
- if(ps.length>6)tt('+'+(ps.length-6)+' WIECEJ',X+w-44,Y+h-7,2);}
+  [(p.mode=='SHADOW'?'P:':'')+p.symbol.slice(0,8),(p.side=='LONG'?'▲':'▼')+p.side,p.entry!=null?fmtP(p.entry):(p.ref!=null?'~'+fmtP(p.ref):'-'),p.price!=null?fmtP(p.price):'-',pctS(pl),p.bot].forEach((v,j)=>tt(String(v),X+cols[j],yy,j==1&&p.side=='SHORT'||j==4&&pl<0?2:3));});
+ if(ps.some(p=>p.mode=='SHADOW'))tt('P: = PAPIER',X+5,Y+h-7,2);if(ps.length>6)tt('+'+(ps.length-6)+' WIECEJ',X+w-44,Y+h-7,2);}
 // ---- Top 10 Krypto ----
 let top10={items:[]};
 const fmtCap=v=>!isFinite(v)||v<=0?'-':v>=1e12?'$'+(v/1e12).toFixed(2)+'T':v>=1e9?'$'+(v/1e9).toFixed(1)+'B':'$'+(v/1e6).toFixed(0)+'M';
@@ -237,7 +237,7 @@ const panel=document.getElementById('board');
 function renderTable(){const tb=document.getElementById('btbody');tb.innerHTML='';const ps=Object.values(positions).sort((a,b)=>b.openedAt-a.openedAt);
  if(!ps.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center">Brak otwartych pozycji</td></tr>';return;}
  for(const p of ps){const tr=document.createElement('tr');const pl=pnl(p);tr.className=p.side=='LONG'?'long':'short';
-  [p.symbol+(p.desk?' ('+p.chain+', shadow)':''),(p.side=='LONG'?'▲ ':'▼ ')+p.side,p.desk?'$'+p.size:p.size,p.entry!=null?fmtP(p.entry):(p.desk?'brak (ref '+(p.ref!=null?fmtP(p.ref):'-')+')':'-'),(p.price!=null?fmtP(p.price):'-')+(p.priceSource=='live'?' •':'')+(p.desk&&p.priceTs?' @'+new Date(p.priceTs).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}):''),pctS(pl)+'%'+(p.desk&&p.entry==null?' vs ref':''),p.desk?'RISK: '+(p.risk||''):p.bot,new Date(p.openedAt).toLocaleString('pl-PL',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})]
+  [p.symbol+(p.mode=='SHADOW'?' [PAPIER]':'')+(p.desk&&p.chain?' ('+p.chain+')':''),(p.side=='LONG'?'▲ ':'▼ ')+p.side,p.desk?'$'+p.size:p.size,p.entry!=null?fmtP(p.entry):(p.desk?'brak (ref '+(p.ref!=null?fmtP(p.ref):'-')+')':'-'),(p.price!=null?fmtP(p.price):'-')+(p.priceSource=='live'?' •':'')+(p.desk&&p.priceTs?' @'+new Date(p.priceTs).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}):''),pctS(pl)+'%'+(p.desk&&p.entry==null?' vs ref':''),p.desk?'RISK: '+(p.risk||''):p.bot,new Date(p.openedAt).toLocaleString('pl-PL',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})]
   .forEach((v,i)=>{const td=document.createElement('td');td.textContent=v;if(i==5)td.className=pl>=0?'pos':'neg';if(p.note&&i==0)td.title=p.note;tr.appendChild(td);});tb.appendChild(tr);}}
 document.getElementById('tb').onclick=()=>panel.classList.toggle('show');document.getElementById('bclose').onclick=()=>panel.classList.remove('show');
 // ---- players ----
