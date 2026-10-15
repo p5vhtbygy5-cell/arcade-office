@@ -181,8 +181,8 @@ function drawF(f,t){const X=f.x*T,Y=f.y*T,w=f.w*T,h=f.h*T;
  case 'historyboard':drawHistory(X,Y+SCR_DY,w,h,t);break;
  case 'botdesk':{box(X,Y+2,w,h-4,WAL[2]);R(X+1,Y+3,w-2,3,'#9a6238');R(X+1,Y+h-9,w-2,1,C[2]);R(X+1,Y+h-8,w-2,5,WAL[1]);R(X+w/2-3,Y+h-6,6,1,C[2]);R(X+3,Y+h-3,1,3,C[2]);R(X+5,Y+h-3,1,3,C[2]);R(X+w-6,Y+h-3,1,3,C[2]);R(X+w-4,Y+h-3,1,3,C[2]);
   const L=f.label;deskDecor(L,X,Y,w,t);
-  // plaque on floor below
-  const pw=tw(L)+6;box(X+w/2-pw/2,Y+h+1,pw,9,3);tt(L,X+w/2-pw/2+3,Y+h+3);break;}
+  // nameplate standing on the desk front edge
+  const pw=tw(L)+6;box(X+w/2-pw/2,Y+h-18,pw,9,3);tt(L,X+w/2-pw/2+3,Y+h-16);break;}
  case 'scales':R(X+7,Y+3,2,11,0);R(X+2,Y+3,12,1,0);const tl=Math.sin(t/700)>0?1:0;box(X,Y+5+tl,6,3,2);box(X+10,Y+6-tl,6,3,2);box(X+4,Y+13,8,3,1);break;
  case 'radar':box(X+6,Y+8,4,8,1);ctx.fillStyle=C[0];ctx.beginPath();ctx.arc(X+8,Y+7,7,Math.PI*0.9,Math.PI*2.1);ctx.fill();ctx.fillStyle=C[3];ctx.beginPath();ctx.arc(X+8,Y+7,5,Math.PI,Math.PI*2);ctx.fill();
   const a=t/500;R(X+8+Math.cos(a)*4,Y+5+Math.sin(a)*1.5,2,2,0);break;
