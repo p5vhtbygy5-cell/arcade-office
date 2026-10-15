@@ -11,7 +11,7 @@ function astar(s,g,avoid){if(!walk(...g))return null;const K=(x,y)=>y*MAP.W+x,op
 const deskOf=n=>MAP.furniture.find(f=>f.type=='botdesk'&&f.label==n);
 const deskFront=n=>{const d=deskOf(n);return [d.x+1,d.y+2];};
 const SPOT={board:()=>[14+(Math.random()*12|0),6],top10:()=>[2+(Math.random()*11|0),6],cabinet:()=>[32,10],chief:()=>[5+(Math.random()*3|0),24],
- coffee:()=>[16,22],fridge:()=>[13,23],wc:()=>[36,24],walk:()=>rnd([[13,13],[8,13],[22,13],[26,13],[10,18],[30,18],[34,13],[32,7]])};
+ printer:()=>[36,12],coffee:()=>[16,22],fridge:()=>[13,23],wc:()=>[36,24],walk:()=>rnd([[13,13],[8,13],[22,13],[26,13],[10,18],[30,18],[34,13],[32,7]])};
 const CHATS=[[[14,25],[16,25]],[[16,13],[18,13]],[[30,8],[32,8]],[[4,18],[6,18]]];
 const LINES={
  CHIEF:{chat:['Jak wyniki?','Trzymamy dyscyplinę.','Dobra robota.','Plan na dziś aktualny.'],report:['Dzięki, notuję.','OK, działaj dalej.','Pilnuj limitów.'],walk:['Jak idzie, zespole?','Obchód biura...']},
@@ -61,7 +61,7 @@ function tick(dt){const now=Date.now();for(const b of Object.values(B)){
  if(!b.step&&b.plan.length){b.step=b.plan.shift();const s=b.step;
   if(s.go){const tgt=s.go=='home'?b.home:s.go;b.path=astar(tileOf(b),tgt)||[];b.target=tgt;setState(b,{status:s.go=='home'?b.name+': wraca do biurka':s.status,act:'walk',carry:s.carry??(s.go=='home'?(b.p.carry=='coffee'?'coffee':null):b.p.carry)});}
   else if(s.wait!=null){b.waitUntil=now+ms(s.wait);if(s.face)b.p.dir=s.face;emitMove(b);setState(b,{act:s.act||'idle',carry:s.carry!==undefined?s.carry:b.p.carry,...(s.status?{status:s.status}:{})});
-   if(s.say)say(b,s.say);if(s.sayOther&&B[s.sayOther[0]])say(B[s.sayOther[0]],s.sayOther[1]);
+   if(s.fn)s.fn();if(s.say)say(b,s.say);if(s.sayOther&&B[s.sayOther[0]])say(B[s.sayOther[0]],s.sayOther[1]);
    if(s.dialog)s.dialog.lines.forEach(([w,l],i)=>setTimeout(()=>say(w,l),ms(i*2500)));}
   else if(s.sync){s.sync.arrived.add(b.name);b.syncStart=now;if(s.face)b.p.dir=s.face;emitMove(b);setState(b,{act:'idle'});}}
  const s=b.step;if(!s)continue;
@@ -82,5 +82,11 @@ setInterval(()=>{const idle=Object.values(B).filter(b=>!b.plan.length&&!b.step&&
  if(!idle.length||away()>=2||!chance(FAST?.8:.35))return;errand(rnd(idle));},ms(3000));
 // desk chatter: thinking bubbles / role lines for bots at desks
 setInterval(()=>{const at=Object.values(B).filter(b=>atHome(b)&&!b.step);if(!at.length)return;const b=rnd(at);say(b,chance(.4)?'...':rnd(BOT_CFG[b.name].lines));},ms(6000));
+// supercomputer printer: paper piles up; every few minutes (random) SCAN collects the printout
+let pile=0;const PILE_MAX=8;const emitPile=()=>io.emit('printer',{pile});
+setInterval(()=>{if(pile<PILE_MAX&&chance(.5)){pile++;emitPile();}},ms(15000));
+function collectPrintout(force){const s=B.SCAN;if(!s||s.plan.length||s.step||!atHome(s)||(!force&&away()>=3))return false;
+ start(s,[go(SPOT.printer(),'SCAN: idzie po wydruk do SUPERKOMPUTERA'),wait(3000,{face:'up',say:'Zbieram wydruk...',carry:'ticket',fn:()=>{pile=0;emitPile();}}),wait(800,{carry:'ticket'})]);return true;}
+(function sched(first){setTimeout(()=>{if(pile>0&&chance(.6))collectPrintout(first);sched(false);},first?+process.env.PRINTER_FIRST_MS:ms(90000+Math.random()*150000));})(!!process.env.PRINTER_FIRST_MS);
 function nudge(n){const b=B[n];if(b&&!b.plan.length&&!b.step&&atHome(b)&&away()<2&&chance(.5))errand(b);}
-return {onPosition,nudge,list:()=>Object.values(B).map(b=>({name:b.name,x:b.p.x,y:b.p.y,tile:tileOf(b),home:b.home,atDesk:atHome(b)&&!b.step&&!b.plan.length,status:b.p.status,act:b.p.act,carry:b.p.carry,zone:MAP.zoneAt(b.p.x,b.p.y)})),walk,errandFor:n=>errand(B[n])};};
+return {onPosition,nudge,printer:()=>pile,collectPrintout,list:()=>Object.values(B).map(b=>({name:b.name,x:b.p.x,y:b.p.y,tile:tileOf(b),home:b.home,atDesk:atHome(b)&&!b.step&&!b.plan.length,status:b.p.status,act:b.p.act,carry:b.p.carry,zone:MAP.zoneAt(b.p.x,b.p.y)})),walk,errandFor:n=>errand(B[n])};};

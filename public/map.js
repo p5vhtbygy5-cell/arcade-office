@@ -29,10 +29,10 @@ const ROLE_ITEM={SIZE:'scales',SCAN:'radar',BOOK:'cabinet',RISK:'alarm',VET:'sta
 const BOT_DESKS=[];
 ['SIZE','SCAN','BOOK','RISK','VET','FILLS'].forEach((n,i)=>{const x=4+(i%3)*12,y=i<3?10:16;
  add('botdesk',x,y,3,2,{label:n});add(ROLE_ITEM[n],x+3,y,1,1,{label:n});BOT_DESKS.push({name:n,x:(x+1.5)*T,y:(y-0.5)*T});});
-add('plant',1,19);add('plant',38,19);add('plant',20,19);add('plant',38,8);add('plant',1,8);
+add('plant',1,19);add('plant',38,19);add('plant',20,19);add('plant',1,8);
 add('copier',1,13,2,1);add('watercooler',38,13);
 // steampunk machinery + the Skull of Satoshi statue (lounge corner, right side of Open Space)
-add('steamengine',1,15,2,2);add('clockwork',35,10,3,2);add('boiler',34,16,2,2);
+add('supercomputer',34,9,5,3);add('boiler',34,16,2,2); // steam supercomputer (printer slot faces tile 36,12)
 // --- Gabinet CHIEF (bottom-left) ---
 add('goldcabinet',1,21,2,1);add('bigdesk',4,22,5,2,{label:'CHIEF'});add('decanter',11,21);add('tickerclock',11,23);add('chair2',9,24);add('globe',11,25);add('plant',10,26);add('plant',1,23);
 add('skull',1,25,2,2); // Skull of Satoshi – centrepiece of the CHIEF office

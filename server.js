@@ -157,6 +157,7 @@ io.on('connection',s=>{
   s.emit('positions',allPositions());
   if(portfolio)s.emit('portfolio',portfolio);
   s.emit('ticker',tickerOut());
+  s.emit('printer',{pile:bots.printer()});
   s.on('join',d=>{
     const p={id:s.id,name:clean(d&&d.name,16)||'Anon',color:COLORS.includes(d&&d.color)?d.color:COLORS[0],sprite:Math.max(0,Math.min(3,(d&&d.sprite)|0)),x:MAP.SPAWN.x,y:MAP.SPAWN.y,dir:'down'};
     p.zone=MAP.zoneAt(p.x,p.y);players[s.id]=p;
