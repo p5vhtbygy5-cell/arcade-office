@@ -1,42 +1,82 @@
-<!DOCTYPE html><html lang="pl"><head><meta charset="utf-8"><title>Krypto Biuro – wersja kieszonkowa</title>
+<!DOCTYPE html><html lang="pl"><head><meta charset="utf-8"><title>Krypto Biuro – wersja arcade</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-:root{--c0:#0f380f;--c1:#306230;--c2:#8bac0f;--c3:#9bbc0f}
-*{box-sizing:border-box}body{margin:0;background:var(--c0);color:var(--c0);font-family:'Press Start 2P',monospace;font-size:9px;overflow:hidden}
-#app{display:flex;height:100vh}#gamewrap{flex:1;display:flex;align-items:center;justify-content:center}
+:root{--bg0:#07061a;--bg1:#120e33;--bg2:#1d1650;--pan:#241c5e;--pan2:#2f2678;--ink:#f4eeff;--dim:#a99cf0;--cyan:#35d6f0;--mag:#ff3fa4;--amb:#ffb63b;--edge:#0a0820}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font-family:'Press Start 2P',monospace;font-size:9px;overflow:hidden;
+ background:radial-gradient(ellipse at 50% 120%,#3a1d6e 0%,transparent 60%),linear-gradient(180deg,#07061a 0%,#140f3d 55%,#2a1458 100%)}
+/* parallax layers: stars + perspective neon grid floor */
+#bgstars,#bggrid{position:fixed;inset:0;pointer-events:none;z-index:0}
+#bgstars{background-image:radial-gradient(1px 1px at 20px 30px,#fff,transparent),radial-gradient(1px 1px at 120px 80px,#9ff,transparent),radial-gradient(2px 2px at 220px 160px,#f8c,transparent),radial-gradient(1px 1px at 300px 40px,#fff,transparent);background-size:340px 220px;opacity:.55;transition:transform .2s ease-out}
+#bggrid{top:55%;perspective:400px;overflow:hidden}
+#bggrid::before{content:'';position:absolute;left:-50%;right:-50%;top:0;height:200%;transform:rotateX(62deg);transform-origin:top;
+ background-image:linear-gradient(rgba(255,63,164,.35) 2px,transparent 2px),linear-gradient(90deg,rgba(53,214,240,.3) 2px,transparent 2px);background-size:60px 60px;animation:grid 4s linear infinite}
+@keyframes grid{to{background-position:0 60px}}
+/* subtle CRT scanlines */
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:50;background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 3px);mix-blend-mode:multiply}
+#app{position:relative;z-index:1;display:flex;height:100vh}
+#gamewrap{flex:1;display:flex;align-items:center;justify-content:center;perspective:1400px}
 canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
-#screen{padding:10px;background:var(--c1);border-radius:8px 8px 30px 8px;box-shadow:inset 0 0 0 3px var(--c0)}
-.gb{background:var(--c3);border:4px solid var(--c0);border-radius:6px;box-shadow:inset 0 0 0 2px var(--c3),inset 0 0 0 4px var(--c1)}
-#side{width:300px;background:var(--c2);border-left:4px solid var(--c0);display:flex;flex-direction:column;padding:8px;gap:8px}
-#side .gb{padding:8px}#side h2{font-size:10px;margin:0 0 6px}
-#plist{line-height:1.8;max-height:150px;overflow-y:auto;font-size:8px}#plist .b{color:var(--c1)}
-#tabs{display:flex;gap:6px}button{font-family:inherit;font-size:8px;background:var(--c3);color:var(--c0);border:3px solid var(--c0);border-radius:4px;padding:6px;cursor:pointer}
-button.on{background:var(--c0);color:var(--c3)}button:hover{background:var(--c2)}button.on:hover{background:var(--c1)}
-#log{flex:1;overflow-y:auto;line-height:1.8;word-wrap:break-word;font-size:8px}#log .sys{color:var(--c1)}#log .tag{color:var(--c1)}#log b{font-weight:normal;text-decoration:underline}
-#form{display:flex;gap:6px}#msg{flex:1;font-family:inherit;font-size:8px;background:var(--c3);color:var(--c0);border:3px solid var(--c0);border-radius:4px;padding:6px;outline:none}
-#login{position:fixed;inset:0;background:var(--c0);display:flex;align-items:center;justify-content:center;z-index:9}
-#login .box{padding:24px;text-align:center;width:440px;line-height:1.8}#login h1{font-size:14px;line-height:1.7;margin:0 0 10px}
-#login input{font-family:inherit;width:100%;padding:8px;margin:6px 0;background:var(--c3);color:var(--c0);border:3px solid var(--c0);outline:none}
+#screen{padding:10px;border-radius:10px;background:linear-gradient(145deg,#3a2f8a,#1a1450);
+ box-shadow:inset 2px 2px 0 rgba(255,255,255,.25),inset -3px -3px 0 rgba(0,0,0,.5),0 0 0 3px var(--edge),0 0 24px rgba(255,63,164,.35),14px 18px 0 rgba(0,0,0,.45);
+ transform:rotateX(4deg);transform-origin:50% 100%;transition:transform .2s ease-out}
+#screen canvas{box-shadow:0 0 0 2px var(--edge),0 0 14px rgba(53,214,240,.35)}
+/* beveled 3D panels */
+.gb{background:linear-gradient(180deg,var(--pan2),var(--pan));border:3px solid var(--edge);border-radius:4px;
+ box-shadow:inset 2px 2px 0 rgba(255,255,255,.18),inset -2px -2px 0 rgba(0,0,0,.4),4px 5px 0 rgba(0,0,0,.45)}
+#side{width:300px;background:linear-gradient(180deg,rgba(29,22,80,.92),rgba(18,14,51,.95));border-left:3px solid var(--mag);box-shadow:-6px 0 18px rgba(255,63,164,.25);display:flex;flex-direction:column;padding:8px;gap:8px}
+#side .gb{padding:8px}#side h2{font-size:10px;margin:0 0 6px;color:var(--amb);text-shadow:2px 2px 0 #000}
+#zone{color:var(--cyan)}
+#plist{line-height:1.8;max-height:150px;overflow-y:auto;font-size:8px}#plist .b{color:var(--dim)}
+#tabs{display:flex;gap:6px}
+button{font-family:inherit;font-size:8px;color:var(--ink);background:linear-gradient(180deg,#4a3aa8,#2e2478);border:3px solid var(--edge);border-radius:4px;padding:6px;cursor:pointer;text-shadow:1px 1px 0 #000;
+ box-shadow:inset 2px 2px 0 rgba(255,255,255,.3),inset -2px -2px 0 rgba(0,0,0,.45),0 4px 0 var(--edge);transform:translateY(0);transition:transform .05s}
+button:hover{background:linear-gradient(180deg,#5d4bc8,#3a2f8a);color:var(--cyan)}
+button:active{transform:translateY(3px);box-shadow:inset 2px 2px 0 rgba(0,0,0,.4),0 1px 0 var(--edge)}
+button.on{background:linear-gradient(180deg,#ff5fb6,#c2207a);color:#fff}button.on:hover{background:linear-gradient(180deg,#ff7cc4,#d42c8a);color:#fff}
+#t10b{color:var(--amb)}#tb{color:var(--cyan)}
+#log{flex:1;overflow-y:auto;line-height:1.8;word-wrap:break-word;font-size:8px;background:linear-gradient(180deg,#120e33,#0d0a28)}
+#log .sys{color:var(--amb)}#log .tag{color:var(--mag)}#log b{font-weight:normal;color:var(--cyan)}
+#form{display:flex;gap:6px}
+#msg,#login input{font-family:inherit;font-size:8px;background:#0d0a28;color:var(--ink);border:3px solid var(--edge);border-radius:4px;padding:6px;outline:none;box-shadow:inset 2px 2px 0 rgba(0,0,0,.6),0 0 0 1px #4a3a8c}
+#msg{flex:1}#msg:focus,#login input:focus{box-shadow:inset 2px 2px 0 rgba(0,0,0,.6),0 0 0 2px var(--cyan)}
+#login{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 120%,#3a1d6e,transparent 60%),linear-gradient(180deg,#07061a,#1d1650);display:flex;align-items:center;justify-content:center;z-index:9;perspective:900px}
+#login .box{padding:24px;text-align:center;width:440px;line-height:1.8;transform:rotateX(6deg);box-shadow:inset 2px 2px 0 rgba(255,255,255,.2),inset -2px -2px 0 rgba(0,0,0,.4),0 0 30px rgba(255,63,164,.4),8px 12px 0 rgba(0,0,0,.5)}
+#login h1{font-size:14px;line-height:1.7;margin:0 0 10px;color:var(--amb);text-shadow:3px 3px 0 var(--mag),5px 5px 0 #000}#login h1 small{color:var(--cyan);text-shadow:2px 2px 0 #000}
+#login input{width:100%;padding:8px;margin:6px 0;font-size:9px}
 #colors,#sprites{display:flex;gap:6px;justify-content:center;margin:6px 0;flex-wrap:wrap}
-#colors canvas,#sprites canvas{border:3px solid var(--c3);cursor:pointer;image-rendering:pixelated}#colors canvas.on,#sprites canvas.on{border-color:var(--c0)}
-.cursor::before{content:'▶ '}.blink{animation:b 1s steps(2) infinite}@keyframes b{50%{opacity:0}}
-#top10{display:none;position:fixed;right:330px;bottom:20px;max-height:60vh;overflow:auto;padding:12px;z-index:6;font-size:8px}#top10.show{display:block}#top10 .bh{margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:20px}#top10 table{border-collapse:collapse}#top10 th{text-align:left;padding:4px 8px;border-bottom:3px solid var(--c0)}#top10 td{padding:5px 8px;white-space:nowrap}#top10 td.neg{background:var(--c0);color:var(--c3)}#top10 td.pos{background:var(--c2)}
-#board{display:none;position:fixed;left:20px;bottom:20px;max-width:calc(100vw - 360px);max-height:45vh;overflow:auto;padding:12px;z-index:5;font-size:8px}
-#board.show{display:block}#board .bh{margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:20px}
-#board table{border-collapse:collapse;width:100%}#board th{text-align:left;padding:4px 8px;border-bottom:3px solid var(--c0)}#board td{padding:5px 8px;white-space:nowrap}
-#board tr.short td:nth-child(2),#board td.neg{background:var(--c0);color:var(--c3)}#board tr.long td:nth-child(2),#board td.pos{background:var(--c2)}
-</style></head><body>
+#colors canvas,#sprites canvas{border:3px solid var(--edge);border-radius:3px;cursor:pointer;image-rendering:pixelated;box-shadow:2px 3px 0 rgba(0,0,0,.5)}
+#colors canvas.on,#sprites canvas.on{border-color:var(--mag);box-shadow:0 0 10px var(--mag)}
+.cursor::before{content:'▶ '}.blink{animation:b 1s steps(2) infinite;color:var(--mag)}@keyframes b{50%{opacity:0}}
+#go{color:var(--amb)}
+/* boards: tilted 3D holo panels */
+.bh{color:var(--amb);text-shadow:2px 2px 0 #000}
+#top10,#board{transform:perspective(900px) rotateY(var(--ry,0deg)) rotateX(3deg);background:linear-gradient(180deg,rgba(36,28,94,.97),rgba(18,14,51,.97));
+ box-shadow:inset 2px 2px 0 rgba(255,255,255,.18),inset -2px -2px 0 rgba(0,0,0,.4),0 0 0 1px var(--cyan),0 0 22px rgba(53,214,240,.3),8px 10px 0 rgba(0,0,0,.5)}
+#top10{--ry:-4deg;display:none;position:fixed;right:330px;bottom:20px;max-height:60vh;overflow:auto;padding:12px;z-index:6;font-size:8px}#top10.show{display:block}
+#top10 .bh,#board .bh{margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:20px}
+#top10 table,#board table{border-collapse:collapse}#board table{width:100%}
+#top10 th,#board th{text-align:left;padding:4px 8px;border-bottom:3px solid var(--mag);color:var(--cyan)}
+#top10 td,#board td{padding:5px 8px;white-space:nowrap}
+#top10 tbody tr:nth-child(odd),#board tbody tr:nth-child(odd){background:rgba(255,255,255,.04)}
+#top10 td.neg,#board td.neg,#board tr.short td:nth-child(2){color:var(--mag)}
+#top10 td.pos,#board td.pos,#board tr.long td:nth-child(2){color:var(--cyan)}
+#board{--ry:4deg;display:none;position:fixed;left:20px;bottom:20px;max-width:calc(100vw - 360px);max-height:45vh;overflow:auto;padding:12px;z-index:5;font-size:8px}
+#board.show{display:block}
+.note{color:var(--dim);margin-top:8px}
+</style></head><body><div id="bgstars"></div><div id="bggrid"></div>
+<div id="bgstars"></div><div id="bggrid"></div>
 <div id="login"><div class="box gb"><h1>KRYPTO BIURO<br><small>wersja kieszonkowa</small></h1>
 <p>Jak masz na imię?</p><input id="nick" maxlength="16" placeholder="np. SatoshiFan">
 <p>Wybierz strój:</p><div id="colors"></div><p>Wybierz postać:</p><div id="sprites"></div>
 <button id="go" style="margin-top:10px;font-size:11px">▶ START</button><p class="blink" style="margin-top:10px">NACIŚNIJ START</p></div></div>
-<div id="board" class="gb"><div class="bh"><span>TABLICA POZYCJI</span><button id="bclose">X</button></div><table><thead><tr><th>Symbol</th><th>Kierunek</th><th>Wielkość</th><th>Cena wejścia</th><th>Aktualna cena</th><th>PnL %</th><th>Bot</th><th>Czas otwarcia</th></tr></thead><tbody id="btbody"></tbody></table><div style="color:var(--c1);margin-top:8px">• = cena live (Binance) · ▲ LONG · ▼ SHORT</div></div>
-<div id="top10" class="gb panel"><div class="bh"><span>🏆 TOP 10 KRYPTO</span><button id="t10close">X</button></div><table><thead><tr><th>#</th><th>Symbol / nazwa</th><th>Cena USD</th><th>24h %</th><th>Kapitalizacja</th></tr></thead><tbody id="t10body"></tbody></table><div id="t10upd" style="color:var(--c1);margin-top:8px"></div></div>
+<div id="board" class="gb"><div class="bh"><span>TABLICA POZYCJI</span><button id="bclose">X</button></div><table><thead><tr><th>Symbol</th><th>Kierunek</th><th>Wielkość</th><th>Cena wejścia</th><th>Aktualna cena</th><th>PnL %</th><th>Bot</th><th>Czas otwarcia</th></tr></thead><tbody id="btbody"></tbody></table><div class="note">• = cena live (Binance) · ▲ LONG · ▼ SHORT</div></div>
+<div id="top10" class="gb panel"><div class="bh"><span>🏆 TOP 10 KRYPTO</span><button id="t10close">X</button></div><table><thead><tr><th>#</th><th>Symbol / nazwa</th><th>Cena USD</th><th>24h %</th><th>Kapitalizacja</th></tr></thead><tbody id="t10body"></tbody></table><div id="t10upd" class="note"></div></div>
 <div id="app"><div id="gamewrap"><div id="screen"><canvas id="c" width="640" height="504"></canvas></div></div>
 <div id="side"><div class="gb"><h2>STATUS</h2><div id="zone">Strefa: -</div><div id="online" style="margin-top:6px">Online: 0</div></div>
 <div class="gb"><div id="plist"></div></div>
 <button id="t10b">🏆 TOP 10</button><button id="tb">▶ TABLICA POZYCJI</button><div id="tabs"><button id="tg" class="on">Globalny</button><button id="tz">Strefa</button></div>
 <div id="log" class="gb"></div><form id="form"><input id="msg" maxlength="200" placeholder="Napisz… (Enter)" autocomplete="off"><button>OK</button></form>
 <div class="gb" style="line-height:1.7;font-size:7px">Ruch: strzałki / WASD<br>Enter: czat · Esc: gra</div></div></div>
-<script src="/socket.io/socket.io.js"></script><script src="map.js"></script><script src="game.js"></script></body></html>
+<script src="/socket.io/socket.io.js"></script><script src="map.js"></script><script src="game.js"></script><script>/* parallax: background + screen tilt follow the mouse */addEventListener("mousemove",e=>{const dx=e.clientX/innerWidth-.5,dy=e.clientY/innerHeight-.5;document.getElementById("bgstars").style.transform=`translate(${-dx*20}px,${-dy*12}px)`;const s=document.getElementById("screen");if(s)s.style.transform=`rotateX(${4-dy*3}deg) rotateY(${dx*3}deg)`;});</script></body></html>
