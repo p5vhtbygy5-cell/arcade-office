@@ -4,8 +4,8 @@ Wirtualne biuro multiplayer w stylu klasycznej konsoli Game Boy (4 odcienie ziel
 ## Strefy
 - **Open Space** – główna sala, w której pracują boty: biurka SIZE (kalkulator, waga, 3 monitory), SCAN (radar, ekrany z wykresami), BOOK (księgi, segregatory, szafa na akta), RISK (lampa alarmowa, tarcza, wskaźnik), VET (lupa, lista kontrolna, pieczątka), FILLS (terminal, drukarka biletów, dzwonek).
 - **Tablica Pozycji** – duża tablica na ścianie Open Space (obszar przed tablicą to osobna strefa czatu).
-- **Gabinet CHIEF** – prywatny gabinet z drzwiami, dużym biurkiem, telefonem, tabliczką i regałem.
-- **Łazienka** – kabiny WC, umywalki, lustra.
+- **Gabinet CHIEF** (lewa część dolnego pasa) – prywatny gabinet z drzwiami, dużym biurkiem, telefonem, tabliczką i regałem.
+- **Łazienka** (prawa część dolnego pasa) – kabiny WC, umywalki, lustra.
 - **Social** – sofy, ekspres do kawy, lodówka, rośliny, TV z konsolą, stoły.
 Czat strefowy działa we wszystkich strefach.
 

@@ -120,18 +120,18 @@ function buildMap(){const c=document.createElement('canvas');c.width=W*T;c.heigh
  const save=ctx;ctxSwap(c.getContext('2d'));
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const z=zoneAt(x*T+8,y*T+8);floorTile(FLOOR[z]||'wood',x,y);}
  // door mats
- for(const [x,y] of [[28,8],[28,17],[6,20],[7,20],[20,20],[21,20]]){R(x*T+2,y*T+2,12,12,1);R(x*T+4,y*T+4,8,8,2);}
+ for(const [x,y] of MAP.DOORS){R(x*T+2,y*T+2,12,12,1);R(x*T+4,y*T+4,8,8,2);}
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(!solid[y][x]||furniture.some(f=>x>=f.x&&x<f.x+f.w&&y>=f.y&&y<f.y+f.h))continue;const X=x*T,Y=y*T;
   if(wallFace[y][x]){const top=y==0||(!wallFace[y-1][x]);if(top){R(X,Y,T,T,'#2a1f5c');R(X,Y,T,3,0);R(X,Y+3,T,1,NEON.hi);R(X,Y+11,T,2,NEON.mag);R(X,Y+13,T,1,'#7a1f5a');}else{R(X,Y,T,T,'#3b2d78');R(X,Y,T,1,'#5b4aa8');R(X,Y+T-3,T,3,0);R(X+((x%2)?0:8),Y,1,T-3,'#2a1f5c');}}
   else{R(X,Y,T,T,0);R(X+2,Y+2,T-4,T-4,'#2a1f5c');R(X+2,Y+2,T-4,1,'#4a3a8c');R(X+3,Y+3,T-6,T-6,'#1a1440');}}
   // ambient occlusion: darken floor just below walls / right of walls (fake depth)
   for(let y=1;y<H;y++)for(let x=0;x<W;x++){if(solid[y][x])continue;const X=x*T,Y=y*T;ctx.fillStyle='rgba(8,4,30,.45)';if(solid[y-1][x]&&!furniture.some(f=>x>=f.x&&x<f.x+f.w&&y-1>=f.y&&y-1<f.y+f.h))ctx.fillRect(X,Y,T,4);if(x>0&&solid[y][x-1]&&!furniture.some(f=>x-1>=f.x&&x-1<f.x+f.w&&y>=f.y&&y<f.y+f.h))ctx.fillRect(X,Y,3,T);}
  // windows on top wall of open space
- for(const wx of [22,25])for(const yy of [0]){const X=wx*T+2,Y=4;box(X,Y,28,24,3);R(X+13,Y,2,24,0);R(X,Y+11,28,2,0);R(X+3,Y+3,4,2,2);R(X+17,Y+3,4,2,2);}
+ for(const wx of [6,8,29,31])for(const yy of [0]){const X=wx*T+2,Y=4;box(X,Y,28,24,3);R(X+13,Y,2,24,0);R(X,Y+11,28,2,0);R(X+3,Y+3,4,2,2);R(X+17,Y+3,4,2,2);}
  // mirrors above sinks
- for(const f of furniture.filter(f=>f.type=='sink')){const X=f.x*T+2,Y=13*T+1;box(X,Y,12,13,3);R(X+3,Y+3,2,5,2);}
+ for(const f of furniture.filter(f=>f.type=='sink')){const X=f.x*T+2,Y=20*T+1;box(X,Y,12,13,3);R(X+3,Y+3,2,5,2);}
  // CHIEF door plaque
- box(27*T+3,7*T+3,24,9,3);tt('CHIEF',27*T+5,7*T+5);box(27*T+6,16*T+3,18,9,3);tt('WC',27*T+11,16*T+5);
+ box(8*T-4,20*T+3,24,9,3);tt('CHIEF',8*T-2,20*T+5);box(34*T+2,20*T+3,18,9,3);tt('WC',34*T+7,20*T+5);
  ctxSwap(save);mapCache=c;}
 function ctxSwap(g){ctx=g;}
 function drawStatic(t){for(const f of furniture)drawF(f,t);}

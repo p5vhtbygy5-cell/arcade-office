@@ -7,7 +7,7 @@ chk(got.a.some(([e,d])=>e=='playerJoined'&&d.name=='Bartek'),'A widzi dołączen
 const M0=require('./public/map.js');const init=got.a.find(([e])=>e=='init')[1];const bots=Object.values(init.players).filter(p=>p.bot);
 chk(bots.length==7&&['CHIEF','SIZE','SCAN','BOOK','RISK','VET','FILLS'].every(n=>bots.some(b=>b.name==n)),'init zawiera 7 botów NPC oznaczonych bot:true');
 chk(M0.zoneAt(15*16,6*16)=='board','Strefa Tablica Pozycji (board) w Open Space');{const bl=await fetch(U+'/api/bots').then(r=>r.json());const hz=b=>M0.zoneAt(b.home[0]*16+8,b.home[1]*16+8);chk(bl.length==7&&hz(bl.find(b=>b.name=='CHIEF'))=='chief'&&bl.filter(b=>hz(b)=='open').length==6,'Biurka: CHIEF w gabinecie, 6 botów w Open Space (/api/bots)');}
-const M=require('./public/map.js');chk(M.zoneAt(14*16,13*16)=='open'&&M.zoneAt(33*16,5*16)=='chief'&&M.zoneAt(31*16,17*16)=='bathroom'&&M.zoneAt(15*16,23*16)=='social'&&M.ZONES.length==6&&!M.ZONES.some(z=>['trading','meeting','lounge','moon','bots'].includes(z.id)),'Nowe strefy (Open Space, Gabinet CHIEF, Łazienka, Social, Tablica, Top 10) rozpoznawane');
+const M=require('./public/map.js');chk(M.zoneAt(14*16,13*16)=='open'&&M.zoneAt(5*16,25*16)=='chief'&&M.zoneAt(31*16,24*16)=='bathroom'&&M.zoneAt(15*16,23*16)=='social'&&M.ZONES.length==6&&!M.ZONES.some(z=>['trading','meeting','lounge','moon','bots'].includes(z.id)),'Nowe strefy (Open Space, Gabinet CHIEF, Łazienka, Social, Tablica, Top 10) rozpoznawane');
 a.emit('move',{x:240,y:216,dir:'right'});await wait(200);
 chk(got.b.some(([e,d])=>e=='playerMoved'&&d.id==a.id&&d.x==240),'B dostaje ruch A');
 a.emit('move',{x:900,y:300});await wait(200);chk(got.a.some(([e])=>e=='correct'),'Serwer odrzuca teleport');
@@ -77,5 +77,5 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  chk(fev.some(([e,d])=>e=='positionClosed'&&d=='feed-T-1')&&fev.some(([e,d])=>e=='bubble'&&d.id=='bot-RISK'&&/Zamykam TFEED \(PAPIER\)/.test(d.text)),'Zamknięcie ogłoszone (PAPIER)');
  const gf=await fetch(F).then(r=>r.json());chk(gf.lastFeedAt&&gf.activity.length==3&&gf.positions.length==0,'GET /api/feed');
  fc.disconnect();}finally{srv.kill();}
-chk(require('./public/map.js').zoneAt(28*16,25.5*16)=='top10','Strefa Top 10 Krypto przy tablicy');
+chk(require('./public/map.js').zoneAt(20*16,25.5*16)=='top10','Strefa Top 10 Krypto przy tablicy');
 b.disconnect();await wait(200);chk(got.a.some(([e])=>e=='playerLeft'),'A widzi wyjście B');a.disconnect();process.exit(ok?0:1);})();
