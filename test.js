@@ -6,7 +6,7 @@ a.emit('join',{name:'Alicja',color:'#00f0ff',sprite:1});await wait(200);b.emit('
 chk(got.a.some(([e,d])=>e=='playerJoined'&&d.name=='Bartek'),'A widzi dołączenie B');
 const M0=require('./public/map.js');const init=got.a.find(([e])=>e=='init')[1];const bots=Object.values(init.players).filter(p=>p.bot);
 chk(bots.length==7&&['CHIEF','SIZE','SCAN','BOOK','RISK','VET','FILLS'].every(n=>bots.some(b=>b.name==n)),'init zawiera 7 botów NPC oznaczonych bot:true');
-chk(M0.zoneAt(15*16,6*16)=='board','Strefa Tablica Pozycji (board) w Open Space');chk(bots.find(b=>b.name=='CHIEF').zone=='chief'&&bots.filter(b=>b.zone=='open').length==6,'CHIEF w gabinecie, 6 botów w Open Space');
+chk(M0.zoneAt(15*16,6*16)=='board','Strefa Tablica Pozycji (board) w Open Space');{const bl=await fetch(U+'/api/bots').then(r=>r.json());const hz=b=>M0.zoneAt(b.home[0]*16+8,b.home[1]*16+8);chk(bl.length==7&&hz(bl.find(b=>b.name=='CHIEF'))=='chief'&&bl.filter(b=>hz(b)=='open').length==6,'Biurka: CHIEF w gabinecie, 6 botów w Open Space (/api/bots)');}
 const M=require('./public/map.js');chk(M.zoneAt(14*16,13*16)=='open'&&M.zoneAt(33*16,5*16)=='chief'&&M.zoneAt(31*16,17*16)=='bathroom'&&M.zoneAt(15*16,23*16)=='social'&&M.ZONES.length==6&&!M.ZONES.some(z=>['trading','meeting','lounge','moon','bots'].includes(z.id)),'Nowe strefy (Open Space, Gabinet CHIEF, Łazienka, Social, Tablica, Top 10) rozpoznawane');
 a.emit('move',{x:240,y:216,dir:'right'});await wait(200);
 chk(got.b.some(([e,d])=>e=='playerMoved'&&d.id==a.id&&d.x==240),'B dostaje ruch A');
@@ -17,7 +17,6 @@ a.emit('chat',{text:'tajne',scope:'zone'});await wait(200);
 chk(got.a.some(([e,d])=>e=='chat'&&d.text=='tajne'&&d.zone=='board'),'A dostaje własną wiadomość strefową (Tablica Pozycji)');
 chk(!got.b.some(([e,d])=>e=='chat'&&d.text=='tajne'),'B (inna strefa) NIE dostaje wiadomości strefowej');
 await wait(4300);chk(got.a.some(([e,d])=>e=='bubble'&&String(d.id).startsWith('bot-')&&d.text),'Boty wysyłają dymki statusu');
-chk(!got.a.some(([e,d])=>e=='playerMoved'&&String(d.id).startsWith('bot-')),'Boty nie generują zdarzeń ruchu');
 // ---- API Tablicy Pozycji ----
 const TOK=process.env.BOT_API_TOKEN||require('fs').readFileSync(__dirname+'/.bot-token','utf8').trim();
 const api=(m,u,body,tok=TOK)=>fetch(U+u,{method:m,headers:{'content-type':'application/json',...(tok?{authorization:'Bearer '+tok}:{})},body:body?JSON.stringify(body):undefined}).then(async r=>({s:r.status,j:await r.json().catch(()=>null)}));
@@ -38,11 +37,27 @@ await api('POST','/api/positions',{id:'test-2',bot:'RISK',symbol:'TESTY',side:'S
 r=await api('DELETE','/api/positions/test-2');chk(r.s==404,'Ponowne zamknięcie -> 404');
 // ---- Top 10 (osobny serwer w trybie mock, bez sieci) ----
 const {spawn}=require('child_process');const os=require('os');
-const srv=spawn(process.execPath,[__dirname+'/server.js'],{env:{...process.env,PORT:'3999',TOP10_MOCK:'1',LIVE_PRICES:'0',BOT_API_TOKEN:'t',POSITIONS_FILE:os.tmpdir()+'/pos-test-'+process.pid+'.json'},stdio:'ignore'});
+const srv=spawn(process.execPath,[__dirname+'/server.js'],{env:{...process.env,PORT:'3999',TOP10_MOCK:'1',BOT_FAST:'1',DESK_BOARD_FILE:'/nonexistent/board.json',LIVE_PRICES:'0',BOT_API_TOKEN:'t',POSITIONS_FILE:os.tmpdir()+'/pos-test-'+process.pid+'.json'},stdio:'ignore'});
 try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('http://localhost:3999/api/top10').then(r=>r.json()).catch(()=>null);}
  chk(t10&&Array.isArray(t10.items)&&t10.items.length==10&&t10.updatedAt&&t10.source=='mock','GET /api/top10: 10 pozycji, updatedAt, source');
  chk(t10&&t10.items.every((c,i)=>c.rank==i+1&&typeof c.symbol=='string'&&typeof c.name=='string'&&c.price>0&&typeof c.change24h=='number'&&c.marketCap>0),'Kształt pozycji Top10 (rank, symbol, name, price, change24h, marketCap)');
  const c=io('http://localhost:3999');const ev=await new Promise(r=>{c.on('top10',r);setTimeout(()=>r(null),2000);});c.disconnect();
- chk(ev&&ev.items.length==10,'Socket.IO wysyła top10 po połączeniu');}finally{srv.kill();}
+ chk(ev&&ev.items.length==10,'Socket.IO wysyła top10 po połączeniu');
+ // ---- zachowanie botów (tryb BOT_FAST) ----
+ const M2=require('./public/map.js');const bc=io('http://localhost:3999');const mv=[],bub=[];bc.on('playerMoved',d=>{if(String(d.id).startsWith('bot-'))mv.push(d);});bc.on('bubble',d=>bub.push(d));await new Promise(r=>bc.on('connect',r));
+ const lst=()=>fetch('http://localhost:3999/api/bots').then(r=>r.json());
+ const tok={'content-type':'application/json',authorization:'Bearer t'};
+ await fetch('http://localhost:3999/api/positions',{method:'POST',headers:tok,body:JSON.stringify({id:'tb1',bot:'SCAN',symbol:'TESTB',side:'LONG',size:1,entry:10})});
+ let scanAtBoard=false,maxAway=0,left=new Set();for(let i=0;i<60;i++){await wait(250);const l=await lst();const aw=l.filter(b=>!b.atDesk);maxAway=Math.max(maxAway,aw.length);aw.forEach(b=>left.add(b.name));if(l.find(b=>b.name=='SCAN').zone=='board')scanAtBoard=true;}
+ chk(scanAtBoard,'Zdarzenie API: SCAN idzie do Tablicy Pozycji');
+ chk(bub.some(d=>d.id=='bot-RISK'&&/ekspozycj/i.test(d.text)),'RISK reaguje na otwarcie pozycji');
+ chk(mv.length>20,'Boty chodzą (zdarzenia ruchu: '+mv.length+')');
+ chk(mv.every(d=>M2.solid[Math.floor(d.y/16)][Math.floor(d.x/16)]===0),'Boty poruszają się tylko po wolnych kafelkach');
+ const byBot={};let jump=0;for(const d of mv){const pr=byBot[d.id];if(pr&&Math.hypot(d.x-pr.x,d.y-pr.y)>40)jump++;byBot[d.id]=d;}chk(jump==0,'Płynny ruch (brak teleportów)');
+ chk(maxAway<=4,'Ograniczona liczba botów poza biurkiem (max '+maxAway+')');
+ let allHome=false;for(let i=0;i<120&&!allHome;i++){await wait(250);const l=await lst();allHome=[...left].every(n=>{const b=l.find(x=>x.name==n);return b.atDesk||(b.tile[0]==b.home[0]&&b.tile[1]==b.home[1]);});}
+ chk(left.size>0&&allHome,'Boty wracają do biurek ('+[...left].join(',')+')');
+ const fin=await lst();chk(fin.length==7&&fin.every(b=>b.status&&M2.solid[b.tile[1]][b.tile[0]]===0),'Nadal 7 botów, każdy ze statusem');
+ bc.disconnect();}finally{srv.kill();}
 chk(require('./public/map.js').zoneAt(28*16,25.5*16)=='top10','Strefa Top 10 Krypto przy tablicy');
 b.disconnect();await wait(200);chk(got.a.some(([e])=>e=='playerLeft'),'A widzi wyjście B');a.disconnect();process.exit(ok?0:1);})();

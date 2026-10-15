@@ -12,6 +12,9 @@ Czat strefowy działa we wszystkich strefach.
 ## Boty NPC
 Serwer wyświetla 7 botów grupy: CHIEF (we własnym gabinecie) oraz SIZE, SCAN, BOOK, RISK, VET, FILLS przy podpisanych biurkach. Każdy ma własny robotyczny sprite, animację w spoczynku i co kilka sekund dymek statusu (zdarzenie `bubble`). Na liście online są oznaczone jako [BOT]. Konfiguracja: `BOT_CFG` w `server.js`, pozycje: `BOT_DESKS` w `public/map.js`.
 
+## Życie biura (boty)
+Boty są sterowane przez serwer (`bots.js`): maszyna stanów + A* po siatce kafelków (ściany, meble, drzwi). Przy biurku piszą na klawiaturze (monitory migają, dymki „...”), a co jakiś czas idą na zadania: SCAN sprawdza Tablicę Pozycji i Top 10, RISK kontroluje biurka, FILLS nosi bilety do BOOK, BOOK odkłada dokumenty do szafy, VET chodzi z checklistą, SIZE idzie do tablicy, wszyscy raportują do CHIEF, a CHIEF robi obchód. Do tego kawa w Social, łazienka i krótkie rozmowy dwóch botów. Naraz poza biurkiem są maks. 2 boty (3 przy zdarzeniach). Otwarcie/zamknięcie pozycji przez API wysyła bota do tablicy, a RISK reaguje. Status bota widać po najechaniu myszką / podejściu i na liście online. `GET /api/bots` – stan botów. `BOT_FAST=1` – przyspieszenie (testy).
+
 ## Uruchomienie lokalnie
     npm install
     npm start            # http://localhost:3000  (obsługuje zmienną PORT)
