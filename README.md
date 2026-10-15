@@ -39,6 +39,9 @@ Stan graczy jest trzymany w pamięci serwera – uruchamiaj jedną instancję (s
 ## Tablica Pozycji
 Strefa z neonową tablicą otwartych pozycji (na mapie) oraz pełną tabelą HTML, która otwiera się automatycznie po wejściu do strefy lub przyciskiem **📊 TABLICA**. LONG – zielony, SHORT – czerwony. Co 30 s serwer pobiera ceny z publicznego API Binance (`SYMBOL` lub `SYMBOLUSDT`); jeśli niedostępne – używana jest cena podana przez bota. Wyłączenie: `LIVE_PRICES=0`. Pozycje zapisywane są w `positions.json` (przetrwają restart, plik w .gitignore).
 
+## Top 10 Krypto
+Tablica w strefie Social (podejdź do niej lub kliknij **🏆 TOP 10**): #, symbol/nazwa, cena USD, zmiana 24h (▲/▼), kapitalizacja. Serwer odświeża dane co 3 min (`TOP10_INTERVAL_MS`, min. 2 min) z CoinGecko, a w razie błędu/limitu z CoinLore lub CoinPaprika; przy awarii pokazywane są ostatnie dane lub „brak danych”. `GET /api/top10` → `{updatedAt, source, items:[{rank,symbol,name,price,change24h,marketCap}], error?}`. `TOP10_MOCK=1` – dane testowe bez sieci (używane w `npm test`).
+
 ## API dla botów
 Zapis wymaga nagłówka `Authorization: Bearer <BOT_API_TOKEN>`. Ustaw zmienną `BOT_API_TOKEN` (na Render: Environment). Jeśli jej brak, serwer generuje token przy starcie i zapisuje go do pliku `.bot-token` (w logu jest tylko ścieżka). Dozwolone boty: CHIEF, SIZE, SCAN, BOOK, RISK, VET, FILLS.
 

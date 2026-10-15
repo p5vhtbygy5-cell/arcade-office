@@ -7,7 +7,7 @@ chk(got.a.some(([e,d])=>e=='playerJoined'&&d.name=='Bartek'),'A widzi dołączen
 const M0=require('./public/map.js');const init=got.a.find(([e])=>e=='init')[1];const bots=Object.values(init.players).filter(p=>p.bot);
 chk(bots.length==7&&['CHIEF','SIZE','SCAN','BOOK','RISK','VET','FILLS'].every(n=>bots.some(b=>b.name==n)),'init zawiera 7 botów NPC oznaczonych bot:true');
 chk(M0.zoneAt(15*16,6*16)=='board','Strefa Tablica Pozycji (board) w Open Space');chk(bots.find(b=>b.name=='CHIEF').zone=='chief'&&bots.filter(b=>b.zone=='open').length==6,'CHIEF w gabinecie, 6 botów w Open Space');
-const M=require('./public/map.js');chk(M.zoneAt(14*16,13*16)=='open'&&M.zoneAt(33*16,5*16)=='chief'&&M.zoneAt(31*16,17*16)=='bathroom'&&M.zoneAt(15*16,23*16)=='social'&&M.ZONES.length==5&&!M.ZONES.some(z=>['trading','meeting','lounge','moon','bots'].includes(z.id)),'Nowe strefy (Open Space, Gabinet CHIEF, Łazienka, Social, Tablica) rozpoznawane');
+const M=require('./public/map.js');chk(M.zoneAt(14*16,13*16)=='open'&&M.zoneAt(33*16,5*16)=='chief'&&M.zoneAt(31*16,17*16)=='bathroom'&&M.zoneAt(15*16,23*16)=='social'&&M.ZONES.length==6&&!M.ZONES.some(z=>['trading','meeting','lounge','moon','bots'].includes(z.id)),'Nowe strefy (Open Space, Gabinet CHIEF, Łazienka, Social, Tablica, Top 10) rozpoznawane');
 a.emit('move',{x:240,y:216,dir:'right'});await wait(200);
 chk(got.b.some(([e,d])=>e=='playerMoved'&&d.id==a.id&&d.x==240),'B dostaje ruch A');
 a.emit('move',{x:900,y:300});await wait(200);chk(got.a.some(([e])=>e=='correct'),'Serwer odrzuca teleport');
@@ -36,4 +36,13 @@ const n1=got.b.length;r=await api('POST','/api/positions/test-1/close');chk(r.s=
 chk(got.b.slice(n1).some(([e,d])=>e=='positionClosed'&&d=='test-1'),'Broadcast zamknięcia');
 await api('POST','/api/positions',{id:'test-2',bot:'RISK',symbol:'TESTY',side:'SHORT',size:1,entry:50,price:45});r=await api('DELETE','/api/positions/test-2');chk(r.s==200&&Math.abs(r.j.pnlPct-10)<1e-9,'DELETE zamyka SHORT, PnL +10%');
 r=await api('DELETE','/api/positions/test-2');chk(r.s==404,'Ponowne zamknięcie -> 404');
+// ---- Top 10 (osobny serwer w trybie mock, bez sieci) ----
+const {spawn}=require('child_process');const os=require('os');
+const srv=spawn(process.execPath,[__dirname+'/server.js'],{env:{...process.env,PORT:'3999',TOP10_MOCK:'1',LIVE_PRICES:'0',BOT_API_TOKEN:'t',POSITIONS_FILE:os.tmpdir()+'/pos-test-'+process.pid+'.json'},stdio:'ignore'});
+try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('http://localhost:3999/api/top10').then(r=>r.json()).catch(()=>null);}
+ chk(t10&&Array.isArray(t10.items)&&t10.items.length==10&&t10.updatedAt&&t10.source=='mock','GET /api/top10: 10 pozycji, updatedAt, source');
+ chk(t10&&t10.items.every((c,i)=>c.rank==i+1&&typeof c.symbol=='string'&&typeof c.name=='string'&&c.price>0&&typeof c.change24h=='number'&&c.marketCap>0),'Kształt pozycji Top10 (rank, symbol, name, price, change24h, marketCap)');
+ const c=io('http://localhost:3999');const ev=await new Promise(r=>{c.on('top10',r);setTimeout(()=>r(null),2000);});c.disconnect();
+ chk(ev&&ev.items.length==10,'Socket.IO wysyła top10 po połączeniu');}finally{srv.kill();}
+chk(require('./public/map.js').zoneAt(28*16,25.5*16)=='top10','Strefa Top 10 Krypto przy tablicy');
 b.disconnect();await wait(200);chk(got.a.some(([e])=>e=='playerLeft'),'A widzi wyjście B');a.disconnect();process.exit(ok?0:1);})();

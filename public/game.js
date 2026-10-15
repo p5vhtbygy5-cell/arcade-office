@@ -117,6 +117,7 @@ function drawStatic(t){for(const f of furniture)drawF(f,t);}
 function drawF(f,t){const X=f.x*T,Y=f.y*T,w=f.w*T,h=f.h*T;
  switch(f.type){
  case 'scoreboard':drawScoreboard(X,Y,w,h,t);break;
+ case 'top10board':drawTop10(X,Y-18,w,h+18,t);break;
  case 'botdesk':{box(X,Y+2,w,h-4,2);R(X+1,Y+3,w-2,3,3);R(X+1,Y+h-8,w-2,5,1);R(X+3,Y+h-3,3,3,0);R(X+w-6,Y+h-3,3,3,0);
   const L=f.label;deskDecor(L,X,Y,w,t);
   // plaque on floor below
@@ -182,6 +183,24 @@ function drawScoreboard(X,Y,w,h,t){box(X-2,Y-2,w+4,h+4,1);box(X,Y,w,h,0);R(X+1,Y
  ps.sort((a,b)=>b.openedAt-a.openedAt).slice(0,6).forEach((p,i)=>{const yy=Y+22+i*7,pl=pnl(p);
   [p.symbol.slice(0,10),(p.side=='LONG'?'▲':'▼')+p.side,fmtP(p.entry),fmtP(p.price??p.entry),(pl>=0?'+':'')+pl.toFixed(2),p.bot].forEach((v,j)=>tt(String(v),X+cols[j],yy,j==1&&p.side=='SHORT'||j==4&&pl<0?2:3));});
  if(ps.length>6)tt('+'+(ps.length-6)+' WIECEJ',X+w-44,Y+h-7,2);}
+// ---- Top 10 Krypto ----
+let top10={items:[]};
+const fmtCap=v=>!isFinite(v)||v<=0?'-':v>=1e12?'$'+(v/1e12).toFixed(2)+'T':v>=1e9?'$'+(v/1e9).toFixed(1)+'B':'$'+(v/1e6).toFixed(0)+'M';
+const fmtUsd=v=>'$'+(v>=1000?Math.round(v).toLocaleString('en-US'):v>=1?v.toFixed(2):v.toPrecision(3));
+const hhmm=ts=>ts?new Date(ts).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}):'--:--';
+function drawTop10(X,Y,w,h,t){box(X-2,Y-2,w+4,h+4,1);box(X,Y,w,h,0);R(X+2,Y+2,w-4,h-4,0);
+ const ttl='TOP 10 KRYPTO';R(X+4,Y+3,tw(ttl)+4,7,3);tt(ttl,X+6,Y+4,0);tt(hhmm(top10.updatedAt),X+w-24,Y+4,2);
+ const cols=[4,16,42,90,130];['#','SYM','CENA','24H','KAP.'].forEach((c,i)=>tt(c,X+cols[i],Y+12,2));R(X+3,Y+18,w-6,1,1);
+ if(!top10.items.length){if((t/600|0)%2)tt('BRAK DANYCH',X+w/2-tw('BRAK DANYCH')/2,Y+40,3);return;}
+ top10.items.slice(0,10).forEach((c,i)=>{const yy=Y+21+i*6,up=(c.change24h||0)>=0;
+  [String(c.rank||i+1),c.symbol.slice(0,5),fmtUsd(c.price),(up?'▲':'▼')+Math.abs(c.change24h||0).toFixed(1)+'%',fmtCap(c.marketCap)].forEach((v,j)=>tt(v,X+cols[j],yy,j==3&&!up?2:3));});}
+const t10=document.getElementById('top10');
+function renderTop10(){document.getElementById('t10upd').textContent='ostatnia aktualizacja: '+(top10.updatedAt?new Date(top10.updatedAt).toLocaleString('pl-PL'):'—')+(top10.source?' ('+top10.source+')':'')+(top10.error&&top10.items.length?' · błąd odświeżania, pokazuję ostatnie dane':'');
+ const tb=document.getElementById('t10body');tb.innerHTML='';if(!top10.items.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center">Brak danych</td></tr>';return;}
+ for(const c of top10.items){const tr=document.createElement('tr');const up=(c.change24h||0)>=0;
+  [c.rank,c.symbol+' · '+c.name,fmtUsd(c.price),(up?'▲ ':'▼ ')+Math.abs(c.change24h||0).toFixed(2)+'%',fmtCap(c.marketCap)].forEach((v,i)=>{const td=document.createElement('td');td.textContent=v;if(i==3)td.className=up?'pos':'neg';tr.appendChild(td);});tb.appendChild(tr);}}
+socket.on('top10',d=>{if(d&&Array.isArray(d.items)){top10=d;renderTop10();}});
+document.getElementById('t10b').onclick=()=>t10.classList.toggle('show');document.getElementById('t10close').onclick=()=>t10.classList.remove('show');
 let positions={},lastZone=null;
 socket.on('positions',list=>{positions={};for(const p of list)positions[p.id]=p;renderTable();});
 socket.on('position',p=>{positions[p.id]=p;renderTable();});
@@ -212,6 +231,6 @@ function loop(t){const dt=Math.min(.05,(t-last)/1000);last=t;update(dt);
  const items=furniture.map(f=>({y:(f.y+f.h)*T,f})).concat(Object.values(players).map(p=>({y:p.ry+4,p})));items.sort((a,b)=>a.y-b.y);
  for(const it of items){if(it.f)drawF(it.f,t);else drawPlayer(it.p,t);}
  drawDialog(t);
- const p=players[me];if(p){const z=zoneAt(p.x,p.y);document.getElementById('zone').textContent='Strefa: '+ZN[z];if(z!=lastZone){if(z=='board')panel.classList.add('show');else if(lastZone=='board')panel.classList.remove('show');lastZone=z;}}
+ const p=players[me];if(p){const z=zoneAt(p.x,p.y);document.getElementById('zone').textContent='Strefa: '+ZN[z];if(z!=lastZone){if(z=='board')panel.classList.add('show');else if(lastZone=='board')panel.classList.remove('show');if(z=='top10')t10.classList.add('show');else if(lastZone=='top10')t10.classList.remove('show');lastZone=z;}}
  requestAnimationFrame(loop);}
 requestAnimationFrame(loop);

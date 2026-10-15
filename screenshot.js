@@ -4,7 +4,7 @@ const U='http://localhost:3000';
 function path(from,to){const k=(x,y)=>y*M.W+x,prev=new Map([[k(...from),null]]),q=[from];while(q.length){const [x,y]=q.shift();if(x==to[0]&&y==to[1])break;
  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(M.solid[ny]?.[nx]===0&&!prev.has(k(nx,ny))&&!M.blocked(nx*16+8,ny*16+8)){prev.set(k(nx,ny),[x,y]);q.push([nx,ny]);}}}
  const out=[];let c=to;while(c){out.unshift(c);c=prev.get(k(...c));}return out;}
-(async()=>{const bots=[['Satoshi','#ffe600',0,[15,23],'HODL!'],['Vitalik','#00f0ff',2,[12,6],'Co na tablicy?'],['DogeLord','#ff6b00',3,[31,17],''],['MoonBoi','#b026ff',1,[24,13],'wen lambo?']];
+(async()=>{const bots=[['Satoshi','#ffe600',0,[15,23],'HODL!'],['Vitalik','#00f0ff',2,[12,6],'Co na tablicy?'],['DogeLord','#ff6b00',3,[31,17],''],['MoonBoi','#b026ff',1,[24,13],'wen lambo?'],['Hodler','#ffffff',0,[27,26],'BTC znowu w top 1']];
  const br=await p.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});const pg=await br.newPage();pg.on('pageerror',e=>console.log('PAGEERROR',e.message));
  await pg.setViewport({width:1640,height:1040});await pg.goto(U);await pg.evaluate(()=>document.fonts.ready);await pg.type('#nick','Złotr');await pg.click('#go');await wait(500);
  const ss=[];for(const [n,c,s,to,t] of bots){const k=io(U);k.emit('join',{name:n,color:c,sprite:s});ss.push([k,to,t]);}await wait(300);

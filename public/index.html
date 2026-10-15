@@ -21,6 +21,7 @@ button.on{background:var(--c0);color:var(--c3)}button:hover{background:var(--c2)
 #colors,#sprites{display:flex;gap:6px;justify-content:center;margin:6px 0;flex-wrap:wrap}
 #colors canvas,#sprites canvas{border:3px solid var(--c3);cursor:pointer;image-rendering:pixelated}#colors canvas.on,#sprites canvas.on{border-color:var(--c0)}
 .cursor::before{content:'▶ '}.blink{animation:b 1s steps(2) infinite}@keyframes b{50%{opacity:0}}
+#top10{display:none;position:fixed;right:330px;bottom:20px;max-height:60vh;overflow:auto;padding:12px;z-index:6;font-size:8px}#top10.show{display:block}#top10 .bh{margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:20px}#top10 table{border-collapse:collapse}#top10 th{text-align:left;padding:4px 8px;border-bottom:3px solid var(--c0)}#top10 td{padding:5px 8px;white-space:nowrap}#top10 td.neg{background:var(--c0);color:var(--c3)}#top10 td.pos{background:var(--c2)}
 #board{display:none;position:fixed;left:20px;bottom:20px;max-width:calc(100vw - 360px);max-height:45vh;overflow:auto;padding:12px;z-index:5;font-size:8px}
 #board.show{display:block}#board .bh{margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:20px}
 #board table{border-collapse:collapse;width:100%}#board th{text-align:left;padding:4px 8px;border-bottom:3px solid var(--c0)}#board td{padding:5px 8px;white-space:nowrap}
@@ -31,10 +32,11 @@ button.on{background:var(--c0);color:var(--c3)}button:hover{background:var(--c2)
 <p>Wybierz strój:</p><div id="colors"></div><p>Wybierz postać:</p><div id="sprites"></div>
 <button id="go" style="margin-top:10px;font-size:11px">▶ START</button><p class="blink" style="margin-top:10px">NACIŚNIJ START</p></div></div>
 <div id="board" class="gb"><div class="bh"><span>TABLICA POZYCJI</span><button id="bclose">X</button></div><table><thead><tr><th>Symbol</th><th>Kierunek</th><th>Wielkość</th><th>Cena wejścia</th><th>Aktualna cena</th><th>PnL %</th><th>Bot</th><th>Czas otwarcia</th></tr></thead><tbody id="btbody"></tbody></table><div style="color:var(--c1);margin-top:8px">• = cena live (Binance) · ▲ LONG · ▼ SHORT</div></div>
+<div id="top10" class="gb panel"><div class="bh"><span>🏆 TOP 10 KRYPTO</span><button id="t10close">X</button></div><table><thead><tr><th>#</th><th>Symbol / nazwa</th><th>Cena USD</th><th>24h %</th><th>Kapitalizacja</th></tr></thead><tbody id="t10body"></tbody></table><div id="t10upd" style="color:var(--c1);margin-top:8px"></div></div>
 <div id="app"><div id="gamewrap"><div id="screen"><canvas id="c" width="640" height="504"></canvas></div></div>
 <div id="side"><div class="gb"><h2>STATUS</h2><div id="zone">Strefa: -</div><div id="online" style="margin-top:6px">Online: 0</div></div>
 <div class="gb"><div id="plist"></div></div>
-<button id="tb">▶ TABLICA POZYCJI</button><div id="tabs"><button id="tg" class="on">Globalny</button><button id="tz">Strefa</button></div>
+<button id="t10b">🏆 TOP 10</button><button id="tb">▶ TABLICA POZYCJI</button><div id="tabs"><button id="tg" class="on">Globalny</button><button id="tz">Strefa</button></div>
 <div id="log" class="gb"></div><form id="form"><input id="msg" maxlength="200" placeholder="Napisz… (Enter)" autocomplete="off"><button>OK</button></form>
 <div class="gb" style="line-height:1.7;font-size:7px">Ruch: strzałki / WASD<br>Enter: czat · Esc: gra</div></div></div>
 <script src="/socket.io/socket.io.js"></script><script src="map.js"></script><script src="game.js"></script></body></html>

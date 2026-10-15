@@ -57,7 +57,28 @@ async function refreshPrices(){const ps=Object.values(positions);if(!ps.length||
   try{const res=await fetch('https://api.binance.com/api/v3/ticker/price',{signal:AbortSignal.timeout(8000)});if(!res.ok)return;const m={};for(const t of await res.json())m[t.symbol]=+t.price;
     for(const p of ps){const v=m[p.symbol]??m[p.symbol+'USDT'];if(v&&p.priceSource!=='bot-locked'){if(p.price!==v){p.price=v;p.priceSource='live';io.emit('position',p);}}}save();}catch{}}
 setInterval(refreshPrices,30000);setTimeout(refreshPrices,3000);
+// ---- Top 10 Krypto (CoinGecko -> CoinPaprika -> CoinLore fallback, cached) ----
+const TOP10_MS=Math.max(120000,+process.env.TOP10_INTERVAL_MS||180000);
+let top10={updatedAt:null,source:null,items:[],error:'brak danych'};let top10Backoff=0;
+const MOCK10=[['BTC','Bitcoin',68000,1.2,1.34e12],['ETH','Ethereum',3400,-0.8,4.1e11],['USDT','Tether',1,0.01,1.2e11],['BNB','BNB',580,0.5,8.5e10],['SOL','Solana',150,3.1,7e10],['USDC','USD Coin',1,0,3.4e10],['XRP','XRP',0.52,-1.4,2.9e10],['DOGE','Dogecoin',0.15,2.2,2.2e10],['TRX','TRON',0.12,0.3,1.05e10],['ADA','Cardano',0.45,-2.1,1.6e10]]
+ .map(([symbol,name,price,change24h,marketCap],i)=>({rank:i+1,symbol,name,price,change24h,marketCap}));
+const getJSON=async u=>{const r=await fetch(u,{headers:{accept:'application/json','user-agent':'krypto-biuro/1.0'},signal:AbortSignal.timeout(10000)});if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;throw e;}return r.json();};
+const SOURCES=[
+ ['CoinGecko',async()=>(await getJSON('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&price_change_percentage=24h'))
+   .map(c=>({rank:c.market_cap_rank,symbol:String(c.symbol).toUpperCase(),name:c.name,price:c.current_price,change24h:c.price_change_percentage_24h,marketCap:c.market_cap}))],
+ ['CoinLore',async()=>(await getJSON('https://api.coinlore.net/api/tickers/?start=0&limit=10')).data
+   .map(c=>({rank:+c.rank,symbol:c.symbol,name:c.name,price:+c.price_usd,change24h:+c.percent_change_24h,marketCap:+c.market_cap_usd})),
+ ['CoinPaprika',async()=>(await getJSON('https://api.coinpaprika.com/v1/tickers?quotes=USD')).filter(c=>c.rank>0).sort((a,b)=>a.rank-b.rank).slice(0,10)
+   .map(c=>({rank:c.rank,symbol:c.symbol,name:c.name,price:c.quotes.USD.price,change24h:c.quotes.USD.percent_change_24h,marketCap:c.quotes.USD.market_cap}))]]];
+async function refreshTop10(){if(process.env.TOP10_MOCK==='1'){top10={updatedAt:Date.now(),source:'mock',items:MOCK10};io.emit('top10',top10);return top10;}
+  if(Date.now()<top10Backoff)return top10;const errs=[];
+  for(const [name,fn] of SOURCES){try{const items=(await fn()).filter(i=>i.symbol&&isFinite(i.price)&&i.price>0).slice(0,10);if(items.length<5)throw new Error('za mało danych');
+    top10={updatedAt:Date.now(),source:name,items};io.emit('top10',top10);return top10;}catch(e){errs.push(name+': '+e.message);if(e.status===429&&name==='CoinGecko')console.log('CoinGecko 429 - używam zapasowego źródła');}}
+  top10={...top10,error:'Nie udało się pobrać danych ('+errs.join('; ')+')'};top10Backoff=Date.now()+60000;console.log('Top10:',top10.error);io.emit('top10',top10);return top10;}
+setInterval(refreshTop10,TOP10_MS);setTimeout(refreshTop10,process.env.TOP10_MOCK==='1'?0:1500);
+app.get('/api/top10',(q,r)=>r.json(top10));
 io.on('connection',s=>{
+  s.emit('top10',top10);
   s.emit('positions',Object.values(positions));
   s.on('join',d=>{
     const p={id:s.id,name:clean(d&&d.name,16)||'Anon',color:COLORS.includes(d&&d.color)?d.color:COLORS[0],sprite:Math.max(0,Math.min(3,(d&&d.sprite)|0)),x:MAP.SPAWN.x,y:MAP.SPAWN.y,dir:'down'};

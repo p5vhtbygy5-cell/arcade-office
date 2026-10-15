@@ -3,13 +3,14 @@
 const T=16, W=40, H=28;
 // order matters: first match wins (board area overlays open space)
 const ZONES=[
+ {id:'top10',name:'Top 10 Krypto',x:22,y:25,w:13,h:2},
  {id:'board',name:'Tablica Pozycji',x:6,y:2,w:16,h:6},
  {id:'open',name:'Open Space',x:1,y:2,w:27,h:18},
  {id:'chief',name:'Gabinet CHIEF',x:29,y:2,w:10,h:11},
  {id:'bathroom',name:'Łazienka',x:29,y:14,w:10,h:6},
  {id:'social',name:'Social',x:1,y:21,w:38,h:6},
 ];
-const FLOOR={open:'wood',board:'wood',chief:'carpet',bathroom:'tile',social:'mat'};
+const FLOOR={open:'wood',board:'wood',chief:'carpet',bathroom:'tile',social:'mat',top10:'mat'};
 const solid=[];for(let y=0;y<H;y++)solid.push(new Array(W).fill(0));
 const wallFace=[];for(let y=0;y<H;y++)wallFace.push(new Array(W).fill(0)); // walls drawn as Pokémon-like wall faces
 function wall(x,y,face){solid[y][x]=1;if(face)wallFace[y][x]=1;}
@@ -35,8 +36,8 @@ BOT_DESKS.unshift({name:'CHIEF',x:33.5*T,y:5.5*T});
 add('stall',35,14,4,3);add('sink',30,14);add('sink',32,14);add('towel',38,19);
 // --- Social ---
 add('sofa',2,22,4,1);add('sofa',2,25,4,1);add('table',3,23,2,2);add('tv',10,21,3,1);add('console',11,22);
-add('sofa',9,25,5,1);add('coffee',24,21);add('fridge',26,21,1,2);add('plant',38,21);add('plant',22,21);
-add('table',30,23,3,2);add('arcadebox',17,21);add('bigplant',37,25);
+add('sofa',9,25,5,1);add('top10board',23,21,11,4);add('coffee',35,21);add('fridge',36,21,1,2);add('plant',38,21);add('plant',22,21);
+add('arcadebox',17,21);add('bigplant',37,25);
 function zoneAt(px,py){const tx=px/T,ty=py/T;for(const z of ZONES)if(tx>=z.x&&tx<z.x+z.w&&ty>=z.y&&ty<z.y+z.h)return z.id;return 'korytarz';}
 function blocked(px,py){const r=5;for(const [dx,dy] of [[-r,-r+3],[r,-r+3],[-r,r],[r,r]]){const tx=Math.floor((px+dx)/T),ty=Math.floor((py+dy)/T);if(tx<0||ty<0||tx>=W||ty>=H||solid[ty][tx])return true;}return false;}
 const api={BOT_DESKS,T,W,H,ZONES,FLOOR,solid,wallFace,furniture,zoneAt,blocked,SPAWN:{x:14*T+8,y:13*T+8}};
