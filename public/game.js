@@ -182,7 +182,7 @@ function drawF(f,t){const X=f.x*T,Y=f.y*T,w=f.w*T,h=f.h*T;
  case 'botdesk':{box(X,Y+2,w,h-4,WAL[2]);R(X+1,Y+3,w-2,3,'#9a6238');R(X+1,Y+h-9,w-2,1,C[2]);R(X+1,Y+h-8,w-2,5,WAL[1]);R(X+w/2-3,Y+h-6,6,1,C[2]);R(X+3,Y+h-3,1,3,C[2]);R(X+5,Y+h-3,1,3,C[2]);R(X+w-6,Y+h-3,1,3,C[2]);R(X+w-4,Y+h-3,1,3,C[2]);
   const L=f.label;deskDecor(L,X,Y,w,t);
   // nameplate standing on the desk front edge
-  const pw=tw(L)+6;box(X+w/2-pw/2,Y+h-18,pw,9,3);tt(L,X+w/2-pw/2+3,Y+h-16);break;}
+  const pw=tw(L)+6;box(X+w/2-pw/2,Y+h-12,pw,9,3);tt(L,X+w/2-pw/2+3,Y+h-10);break;}
  case 'scales':R(X+7,Y+3,2,11,0);R(X+2,Y+3,12,1,0);const tl=Math.sin(t/700)>0?1:0;box(X,Y+5+tl,6,3,2);box(X+10,Y+6-tl,6,3,2);box(X+4,Y+13,8,3,1);break;
  case 'radar':box(X+6,Y+8,4,8,1);ctx.fillStyle=C[0];ctx.beginPath();ctx.arc(X+8,Y+7,7,Math.PI*0.9,Math.PI*2.1);ctx.fill();ctx.fillStyle=C[3];ctx.beginPath();ctx.arc(X+8,Y+7,5,Math.PI,Math.PI*2);ctx.fill();
   const a=t/500;R(X+8+Math.cos(a)*4,Y+5+Math.sin(a)*1.5,2,2,0);break;
@@ -297,7 +297,7 @@ function drawWallFx(t){const a=t/900;
  for(const [x,s] of [[3,0],[17,.3],[24,.6],[31,.15],[36,.8]]){const X=x*T,Y=20*T;R(X,Y+4,T,3,C[1]);R(X,Y+4,T,1,'#c87a4a');R(X+6,Y,4,4,C[2]);R(X+7,Y-1,2,1,NEON.mag);if(((t/2600+s)%1)<0.55)steam(X+8,Y-2,t,s);}
  for(const [x,s] of [[9,0],[22,.5],[27,.2],[34,.7]])gauge(x*T+8,20*T+7,5,0.5+0.45*Math.sin(t/(700+s*400)+s*7));}
 function deskDecor(L,X,Y,w,t){const own=players['bot-'+L];if(own&&own.act=='typing'){R(X+2,Y-12,w-4,1,(t/90|0)%3?0:1);R(X+5,Y+6,((t/70|0)%10)+2,1,0);}
- deskDecor2(L,X,Y,w,t);}
+ ctx.save();ctx.translate(0,6);deskDecor2(L,X,Y,w,t);ctx.restore();} // equipment sits on the desk's back edge
 function deskDecor2(L,X,Y,w,t){const mon=(mx,my,mw,mh,anim)=>{box(mx,my,mw,mh,C[2]);R(mx+1,my+1,mw-2,mh-3,'#2a1a10');R(mx+2,my+2,mw-4,mh-5,anim?'#ffb050':'#c8742e');R(mx+2,my+2,1,1,'#2a1a10');R(mx+mw-3,my+2,1,1,'#2a1a10');R(mx+mw/2-1,my+mh,2,2,C[1]);R(mx-1,my+1,1,3,'#ff9a3c');R(mx+mw,my+1,1,3,'#ff9a3c');};
  switch(L){
  case 'SIZE':for(let i=0;i<3;i++){mon(X+3+i*14,Y-9,12,10,(t/700|0)%3==i);R(X+5+i*14,Y-6,6,1,1);R(X+5+i*14,Y-4,4,1,1);}box(X+34,Y+4,9,10,1);R(X+36,Y+5,5,2,3);for(let j=0;j<2;j++)for(let i=0;i<2;i++)R(X+36+i*3,Y+8+j*3,2,2,3);break;
