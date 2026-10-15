@@ -144,7 +144,18 @@ function buildMap(){const c=document.createElement('canvas');c.width=W*T;c.heigh
  for(const f of furniture.filter(f=>f.type=='sink')){const X=f.x*T+2,Y=20*T+1;box(X,Y,12,13,3);R(X+3,Y+3,2,5,2);}
  // CHIEF door plaque
  box(8*T-4,20*T+3,24,9,3);tt('CHIEF',8*T-2,20*T+5);box(34*T+2,20*T+3,18,9,3);tt('WC',34*T+7,20*T+5);
+ // Persian/Turkish rugs under the bot desks (static layer)
+ for(const f of furniture.filter(f=>f.type=='botdesk'))rug((f.x-1)*T+4,(f.y-1)*T+6,(f.w+3)*T-8,(f.h+2)*T-6);
  ctxSwap(save);mapCache=c;}
+function rug(X,Y,w,h){const RED='#9e2a22',IND='#2e3a7a',GOLD='#d4a24c',CR='#f3e6c8',DK='#5a1610';
+ ctx.fillStyle='rgba(20,8,2,.35)';ctx.fillRect(X+2,Y+2,w,h);
+ for(let i=X+1;i<X+w-1;i+=2){R(i,Y-3,1,3,CR);R(i,Y+h,1,3,CR);} // fringes
+ R(X,Y,w,h,DK);R(X+1,Y+1,w-2,h-2,GOLD);R(X+2,Y+2,w-4,h-4,IND);
+ for(let i=X+3;i<X+w-4;i+=4){R(i,Y+3,2,2,GOLD);R(i+1,Y+h-5,2,2,GOLD);} for(let j=Y+3;j<Y+h-4;j+=4){R(X+3,j,2,2,RED);R(X+w-5,j+1,2,2,RED);}
+ R(X+6,Y+6,w-12,h-12,GOLD);R(X+7,Y+7,w-14,h-14,RED);
+ for(let j=Y+9;j<Y+h-9;j+=4)for(let i=X+9+((j/4|0)%2)*2;i<X+w-9;i+=4)R(i,j,1,1,DK);
+ const cx=X+w/2|0,cy=Y+h/2|0;for(let k=0;k<6;k++){R(cx-k,cy-6+k,2*k+1,1,IND);R(cx-k,cy+6-k,2*k+1,1,IND);}R(cx-1,cy-1,3,3,GOLD);
+ for(const [qx,qy] of [[X+9,Y+9],[X+w-12,Y+9],[X+9,Y+h-12],[X+w-12,Y+h-12]]){R(qx,qy,3,3,IND);R(qx+1,qy+1,1,1,CR);}}
 function ctxSwap(g){ctx=g;}
 function drawStatic(t){for(const f of furniture)drawF(f,t);}
 function drawF(f,t){const X=f.x*T,Y=f.y*T,w=f.w*T,h=f.h*T;
@@ -194,7 +205,23 @@ function drawF(f,t){const X=f.x*T,Y=f.y*T,w=f.w*T,h=f.h*T;
  case 'console':box(X+2,Y+6,12,6,1);R(X+4,Y+8,3,2,3);R(X+10,Y+8,2,2,0);R(X+7,Y+2,1,4,0);break;
  case 'coffee':box(X+1,Y-4,14,20,1);box(X+3,Y-2,10,6,3);tt('KAWA',X+1,Y-1);R(X+6,Y+7,4,3,0);box(X+5,Y+11,6,4,3);if((t/400|0)%2)R(X+7,Y+9,1,2,3);break;
  case 'fridge':box(X,Y-6,w,h+6,3);R(X+1,Y+6,w-2,1,0);R(X+12,Y-2,2,5,0);R(X+12,Y+9,2,8,0);R(X+3,Y-3,6,2,2);break;
+ case 'skull':drawSkull(X,Y,w,h,t);break;
+ case 'clockwork':{box(X,Y+4,w,h-4,WAL[2]);R(X+1,Y+5,w-2,1,C[2]);const a=t/700;gear(X+12,Y+6,11,10,a,C[2]);gear(X+29,Y+2,8,8,-a*1.37+0.2,'#c8742e');gear(X+38,Y+14,6,6,a*1.8,C[2]);gear(X+24,Y+18,5,6,-a*2.2,'#b5862e');
+  R(X+3,Y+h-6,w-6,4,'#2a1a10');tt('MECHANIZM',X+6,Y+h-6,C[2]);break;}
+ case 'steamengine':{box(X+1,Y+6,w-2,h-6,C[1]);R(X+2,Y+7,w-4,1,'#c87a4a');box(X+4,Y-6,10,14,C[2]);R(X+5,Y-5,8,1,NEON.hi);gauge(X+9,Y+1,4,0.5+0.4*Math.sin(t/500));
+  const pz=Math.round(4+4*Math.sin(t/220));box(X+18,Y-4,8,16,'#8a5a24');R(X+19,Y-3+pz,6,3,C[3]);R(X+21,Y-14+pz,2,11,'#e0b45a');gear(X+22,Y+20,6,8,t/220,C[2]);R(X+4,Y+h-6,w-8,2,'#2a1a10');steam(X+9,Y-8,t,.1);if(Math.sin(t/220)>0.7)steam(X+24,Y-10,t,.6);break;}
  case 'arcadebox':box(X+1,Y-8,14,24,1);box(X+3,Y-6,10,8,0);R(X+4,Y-5,8,6,(t/300|0)%2?2:3);R(X+6,Y+5,2,2,0);R(X+10,Y+5,2,2,3);break;}}
+// ---- steampunk mechanics ----
+function gear(cx,cy,r,teeth,ang,col,hub){ctx.fillStyle=col||C[2];ctx.beginPath();const n=teeth*2;for(let k=0;k<=n*2;k++){const a=ang+k*Math.PI/n,rr=(k%4<2)?r:r*0.78;const x=cx+Math.cos(a)*rr,y=cy+Math.sin(a)*rr;k?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.fill();
+ ctx.fillStyle=hub||C[1];ctx.beginPath();ctx.arc(cx,cy,r*0.45,0,7);ctx.fill();ctx.fillStyle='#2a1a10';ctx.beginPath();ctx.arc(cx,cy,Math.max(1,r*0.16),0,7);ctx.fill();}
+function gauge(cx,cy,r,v){ctx.fillStyle=C[2];ctx.beginPath();ctx.arc(cx,cy,r+1,0,7);ctx.fill();ctx.fillStyle=C[3];ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();
+ R(cx-r+1,cy,1,1,NEON.mag);ctx.strokeStyle='#2a1a10';ctx.lineWidth=1;const a=Math.PI*(0.8+1.4*v);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*(r-1),cy+Math.sin(a)*(r-1));ctx.stroke();R(cx,cy,1,1,0);}
+function steam(x,y,t,seed){for(let k=0;k<3;k++){const ph=((t/1400+k/3+seed)%1);const a=1-ph;if(a<=0)continue;ctx.fillStyle='rgba(243,230,200,'+(a*0.65).toFixed(2)+')';const s=2+ph*5|0;ctx.fillRect(x+Math.sin(ph*6+seed*9)*3-s/2|0,y-ph*22|0,s,s);}}
+// animated wall machinery overlay (side walls + wall between Open Space and the bottom rooms)
+function drawWallFx(t){const a=t/900;
+ for(let y=8;y<20;y+=4){gear(8,y*T+8,6,8,a*(y%8?1:-1),C[2]);gear(W*T-8,y*T+8,6,8,-a*(y%8?1:-1),C[2]);}
+ for(const [x,s] of [[3,0],[17,.3],[24,.6],[31,.15],[36,.8]]){const X=x*T,Y=20*T;R(X,Y+4,T,3,C[1]);R(X,Y+4,T,1,'#c87a4a');R(X+6,Y,4,4,C[2]);R(X+7,Y-1,2,1,NEON.mag);if(((t/2600+s)%1)<0.55)steam(X+8,Y-2,t,s);}
+ for(const [x,s] of [[9,0],[22,.5],[27,.2],[34,.7]])gauge(x*T+8,20*T+7,5,0.5+0.45*Math.sin(t/(700+s*400)+s*7));}
 function deskDecor(L,X,Y,w,t){const own=players['bot-'+L];if(own&&own.act=='typing'){R(X+2,Y-12,w-4,1,(t/90|0)%3?0:1);R(X+5,Y+6,((t/70|0)%10)+2,1,0);}
  deskDecor2(L,X,Y,w,t);}
 function deskDecor2(L,X,Y,w,t){const mon=(mx,my,mw,mh,anim)=>{box(mx,my,mw,mh,C[2]);R(mx+1,my+1,mw-2,mh-3,'#2a1a10');R(mx+2,my+2,mw-4,mh-5,anim?'#ffb050':'#c8742e');R(mx+2,my+2,1,1,'#2a1a10');R(mx+mw-3,my+2,1,1,'#2a1a10');R(mx+mw/2-1,my+mh,2,2,C[1]);R(mx-1,my+1,1,3,'#ff9a3c');R(mx+mw,my+1,1,3,'#ff9a3c');};
@@ -211,6 +238,16 @@ function deskDecor2(L,X,Y,w,t){const mon=(mx,my,mw,mh,anim)=>{box(mx,my,mw,mh,C[
  case 'FILLS':mon(X+4,Y-10,20,11,0);tt((t/600|0)%2?'>BUY':'>OK',X+6,Y-7);box(X+6,Y+3,16,5,1);for(let i=0;i<6;i++)R(X+8+i*2,Y+4,1,1,3);
   // bell
   ctx.fillStyle=C[0];ctx.beginPath();ctx.arc(X+36,Y+6,5,Math.PI,0);ctx.fill();R(X+30,Y+6,12,2,0);R(X+35,Y-1,2,2,0);ctx.fillStyle=C[3];ctx.fillRect(X+33,Y+3,2,1);break;}}
+// ---- Skull of Satoshi (Benjamin Von Wong, 2023): e-waste/circuit-board skull with red laser eyes, on a plinth ----
+const SKULL=["....aaaaaaaa....","..aabcbbbbcbaa..",".abbbcbbbbbbcba.","abbcbbbbbbcbbbba","abcbbbbbbbbbbcba","abbeeeebbeeeebba","abbeee*bbe*eebba","abbeeeebbeeeebba",".abbbbbaabbbbba.","..abbbbeebbbbba.","..aabbbbbbbbaa..","...abdbdbdbdba..","...adbdbdbdbda..","....aaaaaaaaa..."];
+function drawSkull(X,Y,w,h,t){const px=3,sx=X+w/2-24,sy=Y-34;
+ box(X+2,Y+8,w-4,h-8,WAL[2]);R(X+3,Y+9,w-6,1,C[2]);R(X+3,Y+h-5,w-6,1,C[2]);box(X+5,Y+h-14,w-10,6,C[2]);
+ box(X+w/2-35,Y+h+1,70,9,C[3]);tt('SKULL OF SATOSHI',X+w/2-31,Y+h+3,0);
+ const pal={a:'#2a1a10',b:'#3f6f88',c:'#c8742e',d:'#c9c2b0',e:'#140a05'};const fl=Math.random()<0.08?0.3:(0.75+0.25*Math.sin(t/90));
+ SKULL.forEach((row,j)=>{for(let i=0;i<16;i++){const ch=row[i];if(ch=='.')continue;let c=pal[ch];if(ch=='*')c='rgba(255,40,30,'+fl.toFixed(2)+')';ctx.fillStyle=c;ctx.fillRect(sx+i*px,sy+j*px,px,px);
+  if(ch=='b'&&(i*7+j*3)%5==0){ctx.fillStyle='#d4a24c';ctx.fillRect(sx+i*px,sy+j*px,1,1);}}});
+ ctx.fillStyle='rgba(255,40,30,'+(0.18*fl).toFixed(2)+')';ctx.fillRect(sx+3*px,sy+4*px,5*px,4*px);ctx.fillRect(sx+8*px,sy+4*px,5*px,4*px);
+ if(fl>0.85){ctx.fillStyle='rgba(255,60,40,.35)';ctx.fillRect(sx+6*px+1,sy+7*px,1,14);ctx.fillRect(sx+10*px+1,sy+7*px,1,14);}}
 // ---- positions board ----
 function fmtP(v){v=+v;return v>=1000?v.toFixed(0):v>=1?v.toFixed(2):v.toPrecision(3);}
 function pnl(p){const b=p.desk?p.pnlBase:p.entry;if(!b)return NaN;const c=p.price??b;return (c-b)/b*100*(p.side=='LONG'?1:-1);}
@@ -323,6 +360,7 @@ function loop(t){const dt=Math.min(.05,(t-last)/1000);last=t;update(dt);
  const items=furniture.map(f=>({y:(f.y+f.h)*T,f})).concat(Object.values(players).map(p=>({y:p.ry+4,p})));items.sort((a,b)=>a.y-b.y);
  for(const it of items){if(it.f)drawF(it.f,t);else drawPlayer(it.p,t);}
  for(const [st,sx,sy] of statusTags)tag(st,Math.max(tw(st)/2+4,Math.min(cv.width-tw(st)/2-4,sx)),Math.min(sy,MAPH-10),true);statusTags=[];
+ drawWallFx(t);
  for(const [bp,bx,by] of bubbleQ)drawBubble(bp,bx,by);bubbleQ=[];
  drawTicker(t);drawDialog(t);
  const p=players[me];if(p){const z=zoneAt(p.x,p.y);document.getElementById('zone').textContent='Strefa: '+ZN[z];if(z!=lastZone){if(z=='board')panel.classList.add('show');else if(lastZone=='board')panel.classList.remove('show');if(z=='top10')t10.classList.add('show');else if(lastZone=='top10')t10.classList.remove('show');lastZone=z;}}

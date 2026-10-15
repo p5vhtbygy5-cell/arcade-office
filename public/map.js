@@ -31,6 +31,8 @@ const BOT_DESKS=[];
  add('botdesk',x,y,3,2,{label:n});add(ROLE_ITEM[n],x+3,y,1,1,{label:n});BOT_DESKS.push({name:n,x:(x+1.5)*T,y:(y-0.5)*T});});
 add('plant',1,19);add('plant',38,19);add('plant',20,19);add('plant',38,8);add('plant',1,8);
 add('copier',1,13,2,1);add('watercooler',38,13);
+// steampunk machinery + the Skull of Satoshi statue (lounge corner, right side of Open Space)
+add('steamengine',1,15,2,2);add('clockwork',35,10,3,2);add('skull',34,16,2,2);
 // --- Gabinet CHIEF (bottom-left) ---
 add('bookshelf',1,21,3,1);add('bigdesk',4,22,5,2,{label:'CHIEF'});add('plant',11,21);add('chair2',1,24);add('globe',11,25);add('plant',1,26);
 BOT_DESKS.unshift({name:'CHIEF',x:6.5*T,y:21.5*T});
