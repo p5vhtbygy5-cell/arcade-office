@@ -82,7 +82,8 @@ setInterval(refreshTop10,TOP10_MS);setTimeout(refreshTop10,process.env.TOP10_MOC
 const WM_URL=(process.env.WM_URL||'http://[::1]:3004').replace(/\/$/,'');if(/worldmonitor\.app/i.test(WM_URL))throw new Error('WM_URL musi wskazywać lokalny WorldMonitor');
 const NEWS_MS=5*60000,CRYPTO_MS=60000,NEWS_CATS=['politics','us','europe','middleeast','asia','intel','finance','energy','africa','latam','ai','tech'];
 const ticker={news:{items:[],updatedAt:null,error:'brak danych',source:WM_URL},crypto:{items:[],updatedAt:null,error:'brak danych',source:'CoinGecko'}};
-const tickerOut=()=>({news:ticker.news,crypto:ticker.crypto});
+let feedNews=null; // optional 'news' from the desk feed (box reads the local WorldMonitor) – used when our own WM fetch fails/is absent (e.g. on Render)
+const tickerOut=()=>({news:(!ticker.news.error&&ticker.news.items.length)||!feedNews?ticker.news:{...feedNews,note:'z feedu desku ('+ticker.news.error+')'},crypto:ticker.crypto});
 async function refreshNews(){try{const j=await getJSON(WM_URL+'/api/news/v1/list-feed-digest?variant=full&lang=en');const seen=new Set(),all=[];
   for(const c of NEWS_CATS)for(const it of ((j.categories||{})[c]||{}).items||[]){const title=String(it.title||'').replace(/\s+/g,' ').trim();const k=title.toLowerCase().slice(0,60);if(!title||seen.has(k))continue;seen.add(k);
    all.push({title:title.slice(0,140),source:String(it.source||'').slice(0,40),category:c,publishedAt:+it.publishedAt||null,score:+it.importanceScore||0});}
@@ -146,10 +147,15 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   const announce=first?fresh.slice(-3):fresh.slice(-6);res.activity=fresh.length;
   announce.forEach((a,i)=>setTimeout(()=>{io.emit('chat',{system:true,text:`🤖 ${a.bot}: ${a.text}`,scope:'global',ts:Date.now()});io.emit('bubble',{id:'bot-'+a.bot,text:a.text});bots.nudge(a.bot);},i*2500));
   if(b.top10&&Array.isArray(b.top10)&&b.top10.length){desk={...(desk||{}),top10:b.top10.slice(0,10),top10_cycle_ts:b.top10_cycle_ts,top10_rule:b.top10_rule,updatedAt:b.updatedAt};const t=deskTop10();if(t)io.emit('top10',t);}
+  if(b.news&&typeof b.news==='object'&&Array.isArray(b.news.items)){const items=b.news.items.slice(0,20).map(x=>({title:String(x&&x.title||'').replace(/[<>]/g,'').slice(0,140),source:String(x&&x.source||'').replace(/[<>]/g,'').slice(0,40),category:String(x&&x.category||'').slice(0,20),publishedAt:+(x&&x.publishedAt)||null})).filter(x=>x.title);
+    if(items.length){feedNews={items,updatedAt:Date.parse(b.news.updatedAt)||Date.now(),error:null,source:'feed:'+String(b.news.source||'desk').slice(0,30)};io.emit('ticker',tickerOut());}}
+  if(b.botEvents&&typeof b.botEvents==='object'){const ev={};for(const n of BOT_NAMES){const l=b.botEvents[n];ev[n]=(Array.isArray(l)?l:[]).slice(0,10).map(x=>({ts:String(x&&x.ts||'').slice(0,40),
+     text:String(x&&x.text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'').replace(/[<>]/g,'').replace(/0x[0-9a-fA-F]{6,}|[1-9A-HJ-NP-Za-km-z]{30,}/g,'').trim().slice(0,60)})).filter(x=>x.text);}bots.setEvents(ev);}
   if(b.portfolio!==undefined){const pf=cleanPortfolio(b.portfolio);if(pf){portfolio=pf;io.emit('portfolio',portfolio);}}
   return res;}
 app.post('/api/feed',auth,(q,r)=>{const res=applyFeed(q.body);if(res.error)return r.status(400).json({error:'Błędne dane',details:res.error});r.json({ok:true,...res});});
 app.get('/api/feed',(q,r)=>r.json({lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:feedActivity.slice(-30)}));
+app.get('/api/bot-events',(q,r)=>r.json(bots.events()));
 app.get('/api/portfolio',(q,r)=>r.json(portfolio||{empty:true,trades:0,series:[],recent:[],note:'brak historii portfela (feed jeszcze nie przysłał danych)'}));
 app.get('/api/desk',(q,r)=>r.json(desk||{error:'brak board.json'}));
 io.on('connection',s=>{

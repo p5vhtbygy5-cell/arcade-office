@@ -176,9 +176,9 @@ function drawStatic(t){for(const f of furniture)drawF(f,t);}
 function drawF(f,t){const X=f.x*T,Y=f.y*T,w=f.w*T,h=f.h*T;
  if(!/board$/.test(f.type))shade(X+1,Y+h-5,w-2,6);
  switch(f.type){
- case 'scoreboard':drawScoreboard(X,Y,w,h,t);break;
- case 'top10board':drawTop10(X,Y,w,h,t);break;
- case 'historyboard':drawHistory(X,Y,w,h,t);break;
+ case 'scoreboard':drawScoreboard(X,Y+SCR_DY,w,h,t);break;
+ case 'top10board':drawTop10(X,Y+SCR_DY,w,h,t);break;
+ case 'historyboard':drawHistory(X,Y+SCR_DY,w,h,t);break;
  case 'botdesk':{box(X,Y+2,w,h-4,WAL[2]);R(X+1,Y+3,w-2,3,'#9a6238');R(X+1,Y+h-9,w-2,1,C[2]);R(X+1,Y+h-8,w-2,5,WAL[1]);R(X+w/2-3,Y+h-6,6,1,C[2]);R(X+3,Y+h-3,1,3,C[2]);R(X+5,Y+h-3,1,3,C[2]);R(X+w-6,Y+h-3,1,3,C[2]);R(X+w-4,Y+h-3,1,3,C[2]);
   const L=f.label;deskDecor(L,X,Y,w,t);
   // plaque on floor below
@@ -247,6 +247,7 @@ function steam(x,y,t,seed){for(let k=0;k<3;k++){const ph=((t/1400+k/3+seed)%1);c
 let printerPile=0;socket.on('printer',d=>{if(d&&isFinite(d.pile))printerPile=Math.max(0,Math.min(8,d.pile|0));});
 function reel(cx,cy,r,a){ctx.fillStyle='#2a1a10';ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();ctx.fillStyle='#c9c2b0';ctx.beginPath();ctx.arc(cx,cy,r-1,0,7);ctx.fill();ctx.fillStyle='#5a3a24';ctx.beginPath();ctx.arc(cx,cy,r*0.62,0,7);ctx.fill();
  ctx.strokeStyle='#2a1a10';ctx.lineWidth=1;for(let k=0;k<3;k++){const q=a+k*2.094;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(q)*(r-1),cy+Math.sin(q)*(r-1));ctx.stroke();}R(cx-1,cy-1,2,2,C[2]);}
+const SCR_DY=9; // wall screens drawn 9px lower to make room for the two ticker strips
 function drawSuper(X,Y,w,h,t){const top=Y-22,H=h+22;
  // pipes + boiler (right)
  box(X+w-16,top+6,14,H-10,C[1]);R(X+w-15,top+7,2,H-12,'#c87a4a');for(let j=top+10;j<Y+h-6;j+=6)R(X+w-16,j,14,1,'#5a2a14');gauge(X+w-9,top+16,4,0.5+0.4*Math.sin(t/520));
@@ -348,13 +349,14 @@ function valves(X,Y,w,t){Y+=86;for(let i=X+10;i<X+w-8;i+=28){R(i,Y-6,6,5,C[1]);R
 // ---- top-wall ticker (marquee): news <-> top 10 crypto ----
 let ticker=null;socket.on('ticker',d=>{if(d&&typeof d=='object')ticker=d;});
 const ascii=s=>String(s).replace(/ł/g,'l').replace(/Ł/g,'L').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[‘’`]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/[^A-Za-z0-9 .,:;%+\-\/!?$()#"'@_*]/g,' ').replace(/'/g,'').replace(/;/g,',').replace(/\s+/g,' ').trim();
-function tickerSegs(){const segs=[],n=ticker&&ticker.news,c=ticker&&ticker.crypto;
- segs.push(['** WIADOMOSCI SWIAT: ',C[2]]);if(n&&n.items&&n.items.length)n.items.slice(0,8).forEach(i=>{segs.push([ascii(i.title),C[3]]);segs.push([' ('+ascii(i.source)+')   *   ',C[1]]);});else segs.push(['BRAK DANYCH (WORLDMONITOR)   *   ',NEON.mag]);
- segs.push(['** TOP 10 KRYPTO: ',C[2]]);if(c&&c.items&&c.items.length)c.items.forEach(i=>{const up=(i.change24h||0)>=0;segs.push([i.symbol+' '+fmtUsd(i.price)+' ',NEON.amber]);segs.push([(i.change24h==null?'-':(up?'+':'-')+Math.abs(i.change24h).toFixed(2)+'%')+'   ',up?NEON.cyan:NEON.mag]);});else segs.push(['BRAK DANYCH (COINGECKO)   ',NEON.mag]);
- return segs;}
-function drawTicker(t){const X=18,Y=1,w=W*T-36,h=11;R(X-2,Y-1,w+4,h+2,C[2]);R(X-1,Y,w+2,1,NEON.hi);R(X,Y+1,w,h-2,'#140a05');for(let i=X;i<X+w;i+=24){R(i,Y-1,1,1,'#7a5a20');R(i,Y+h-1,1,1,NEON.hi);}gear(X-4,Y+5,5,7,t/500,C[2]);gear(X+w+4,Y+5,5,7,-t/500,'#c8742e');
- const segs=tickerSegs(),tot=segs.reduce((a,[s])=>a+tw(s)+1,0)||1;let off=X-((t/1000*28)%tot);ctx.save();ctx.beginPath();ctx.rect(X,Y+1,w,h-2);ctx.clip();
- for(let pass=0;pass<2;pass++){let x=off+pass*tot;for(const [s,c] of segs){const ww=tw(s)+1;if(x+ww>X&&x<X+w)tt(s,x|0,Y+3,c);x+=ww;}}ctx.restore();}
+// two separate strip monitors: WIADOMOSCI SWIAT (top) and TOP 10 KRYPTO (below), each scrolling on its own with its own 'brak danych'
+function newsSegs(){const n=ticker&&ticker.news,s=[];if(n&&n.items&&n.items.length)n.items.slice(0,10).forEach(i=>{s.push([ascii(i.title),C[3]]);s.push([' ('+ascii(i.source)+')   *   ',C[1]]);});else s.push(['BRAK DANYCH (WORLDMONITOR)        ',NEON.mag]);return s;}
+function cryptoSegs(){const c=ticker&&ticker.crypto,s=[];if(c&&c.items&&c.items.length)c.items.forEach(i=>{const up=(i.change24h||0)>=0;s.push([i.symbol+' '+fmtUsd(i.price)+' ',NEON.amber]);s.push([(i.change24h==null?'-':(up?'+':'-')+Math.abs(i.change24h).toFixed(2)+'%')+'   *   ',up?NEON.cyan:NEON.mag]);});else s.push(['BRAK DANYCH (COINGECKO)        ',NEON.mag]);return s;}
+function drawStrip(Y,label,segs,speed,t,dir){const X=18,w=W*T-36,h=10;R(X-2,Y-1,w+4,h+2,C[2]);R(X-1,Y,w+2,1,NEON.hi);R(X,Y+1,w,h-2,'#140a05');for(let i=X;i<X+w;i+=24){R(i,Y-1,1,1,'#7a5a20');R(i,Y+h,1,1,NEON.hi);}
+ gear(X-4,Y+5,5,7,dir*t/500,C[2]);gear(X+w+4,Y+5,5,7,-dir*t/500,'#c8742e');const lw=tw(label)+6;R(X,Y+1,lw,h-2,C[2]);tt(label,X+3,Y+2,0);R(X+lw,Y+1,1,h-2,C[1]);
+ const x0=X+lw+2,ww=w-lw-2,tot=segs.reduce((a,[s])=>a+tw(s)+1,0)||1;let off=x0-((t/1000*speed)%tot);ctx.save();ctx.beginPath();ctx.rect(x0,Y+1,ww,h-2);ctx.clip();
+ for(let pass=0;pass<Math.ceil(ww/tot)+1;pass++){let x=off+pass*tot;for(const [s,c] of segs){const sw=tw(s)+1;if(x+sw>x0&&x<x0+ww)tt(s,x|0,Y+2,c);x+=sw;}}ctx.restore();}
+function drawTicker(t){drawStrip(1,'WIADOMOSCI SWIAT',newsSegs(),26,t,1);drawStrip(12,'TOP 10 KRYPTO',cryptoSegs(),20,t,-1);}
 function screenHead(X,Y,w,ttl,right,t){valves(X,Y,w,t);R(X+3,Y+3,tw(ttl)+4,7,C[2]);tt(ttl,X+5,Y+4,0);if(right)tt(right,X+w-tw(right)-4,Y+4,C[3]);}
 const usd=v=>v==null?'-':(v<0?'-':'')+'$'+Math.abs(v).toFixed(2),sg=v=>v==null?'-':(v>=0?'+':'')+v.toFixed(2);
 function drawScoreboard(X,Y,w,h,t){frame(X,Y,w,h);screenHead(X,Y,w,'TABLICA POZYCJI',hhmm(Date.now()),t);

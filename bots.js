@@ -81,7 +81,9 @@ let last=Date.now();setInterval(()=>{const n=Date.now();tick(Math.min(.3,(n-last
 setInterval(()=>{const idle=Object.values(B).filter(b=>!b.plan.length&&!b.step&&atHome(b)&&Date.now()-b.idleSince>ms(15000));
  if(!idle.length||away()>=2||!chance(FAST?.8:.35))return;errand(rnd(idle));},ms(3000));
 // desk chatter: thinking bubbles / role lines for bots at desks
-setInterval(()=>{const at=Object.values(B).filter(b=>atHome(b)&&!b.step);if(!at.length)return;const b=rnd(at);say(b,chance(.4)?'...':rnd(BOT_CFG[b.name].lines));},ms(6000));
+// desk chatter: each bot talks about one of its last 10 REAL events (botEvents from the desk feed); with none, a neutral idle line
+let events={};const IDLE=['...','Czekam na dane z desku.','Przy biurku.'];
+setInterval(()=>{const at=Object.values(B).filter(b=>atHome(b)&&!b.step);if(!at.length)return;const b=rnd(at);const ev=events[b.name]||[];say(b,ev.length&&!chance(.25)?rnd(ev).text:rnd(IDLE));},ms(12000)); // 12 s (halved frequency, 22:13)
 // supercomputer printer: paper piles up; every few minutes (random) SCAN collects the printout
 let pile=0;const PILE_MAX=8;const emitPile=()=>io.emit('printer',{pile});
 setInterval(()=>{if(pile<PILE_MAX&&chance(.5)){pile++;emitPile();}},ms(15000));
@@ -89,4 +91,4 @@ function collectPrintout(force){const s=B.SCAN;if(!s||s.plan.length||s.step||!at
  start(s,[go(SPOT.printer(),'SCAN: idzie po wydruk do SUPERKOMPUTERA'),wait(3000,{face:'up',say:'Zbieram wydruk...',carry:'ticket',fn:()=>{pile=0;emitPile();}}),wait(800,{carry:'ticket'})]);return true;}
 (function sched(first){setTimeout(()=>{if(pile>0&&chance(.6))collectPrintout(first);sched(false);},first?+process.env.PRINTER_FIRST_MS:ms(90000+Math.random()*150000));})(!!process.env.PRINTER_FIRST_MS);
 function nudge(n){const b=B[n];if(b&&!b.plan.length&&!b.step&&atHome(b)&&away()<2&&chance(.5))errand(b);}
-return {onPosition,nudge,printer:()=>pile,collectPrintout,list:()=>Object.values(B).map(b=>({name:b.name,x:b.p.x,y:b.p.y,tile:tileOf(b),home:b.home,atDesk:atHome(b)&&!b.step&&!b.plan.length,status:b.p.status,act:b.p.act,carry:b.p.carry,zone:MAP.zoneAt(b.p.x,b.p.y)})),walk,errandFor:n=>errand(B[n])};};
+return {onPosition,nudge,setEvents:e=>{events=e||{};},events:()=>events,printer:()=>pile,collectPrintout,list:()=>Object.values(B).map(b=>({name:b.name,x:b.p.x,y:b.p.y,tile:tileOf(b),home:b.home,atDesk:atHome(b)&&!b.step&&!b.plan.length,status:b.p.status,act:b.p.act,carry:b.p.carry,zone:MAP.zoneAt(b.p.x,b.p.y)})),walk,errandFor:n=>errand(B[n])};};
