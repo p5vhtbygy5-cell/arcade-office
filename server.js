@@ -129,14 +129,14 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
     if(p.size!=null&&size==null)e.push('size');if(p.entry!=null&&entry==null)e.push('entry');if(p.price!=null&&price==null)e.push('price');if(p.refPrice!=null&&ref==null)e.push('refPrice');
     if(e.length)return errs.push(`positions[${i}]: `+e.join(','));
     clean.push({id:'feed-'+id.replace(/[^A-Za-z0-9_-]/g,'_'),feedId:id,feed:true,desk:true,bot,symbol,side,mode,size,sizeUsd:size,entry,ref,pnlBase:entry??ref,price,
-      chain:p.chain?String(p.chain).slice(0,20):null,status:p.status?String(p.status).replace(/[<>]/g,'').slice(0,200):'',note:[p.chain,mode=='SHADOW'?'PAPIER':'REAL',p.status].filter(Boolean).join(' · ').replace(/[<>]/g,'').slice(0,200),
+      chain:p.chain?String(p.chain).slice(0,20):null,status:p.status?String(p.status).replace(/[<>]/g,'').slice(0,200):'',note:[p.chain,p.status].filter(Boolean).join(' · ').replace(/[<>]/g,'').slice(0,200),
       openedAt:Date.parse(p.openedAt)||Date.now(),updatedAt:Date.now(),priceSource:'desk'});});
   if(errs.length)return {error:errs};
   lastFeedAt=Date.now();const res={opened:[],updated:[],closed:[],activity:0};const ids=new Set(clean.map(p=>p.id));
   for(const p of clean){const old=positions[p.id];positions[p.id]=p;io.emit('position',p);
-    if(!old){res.opened.push(p.id);botSay(p.bot,`Otwieram ${p.side} ${p.symbol}${p.mode=='SHADOW'?' (PAPIER)':''}`);bots.onPosition('open',p);}else res.updated.push(p.id);}
+    if(!old){res.opened.push(p.id);botSay(p.bot,`Otwieram ${p.side} ${p.symbol}`);bots.onPosition('open',p);}else res.updated.push(p.id);}
   for(const p of Object.values(positions))if(p.feed&&!ids.has(p.id)){delete positions[p.id];io.emit('positionClosed',p.id);res.closed.push(p.id);
-    const b=p.pnlBase,pl=b&&p.price?(p.price-b)/b*100*(p.side==='LONG'?1:-1):null;botSay(p.bot,`Zamykam ${p.symbol}${p.mode=='SHADOW'?' (PAPIER)':''}${pl!=null?` (${pl>=0?'+':''}${pl.toFixed(2)}%)`:''}`);bots.onPosition('close',p);}
+    const b=p.pnlBase,pl=b&&p.price?(p.price-b)/b*100*(p.side==='LONG'?1:-1):null;botSay(p.bot,`Zamykam ${p.symbol}${pl!=null?` (${pl>=0?'+':''}${pl.toFixed(2)}%)`:''}`);bots.onPosition('close',p);}
   save();io.emit('positions',allPositions());
   // activity -> chat + bubbles (+ errand when the bot is idle); first feed only marks history as seen
   const first=feedSeen.size===0;const fresh=[];

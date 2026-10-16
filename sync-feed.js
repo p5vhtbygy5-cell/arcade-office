@@ -55,6 +55,7 @@ async function refreshNews(){if(/worldmonitor\.app/i.test(WM_URL))return null;if
 // ---- botEvents: each bot's last 10 REAL events (ledger + logs + trades.jsonl) as short Polish ASCII lines. Only whitelisted fields; no addresses/keys ----
 const ASC=x=>String(x??'').replace(/ł/g,'l').replace(/Ł/g,'L').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'').replace(/\s+/g,' ').trim();
 const TK=x=>ASC(x).split(' ')[0].slice(0,14);
+const SYM=(tok,chain,addr)=>{let s=String(tok||'').toUpperCase().replace(/[^A-Z0-9_.-]/g,'').slice(0,20);if(s)return s;const a=String(addr||'').replace(/[^A-Za-z0-9]/g,'');const c=String(chain||'TOK').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,3)||'TOK';return (c+(a.slice(-6)||'X')).slice(0,20);};
 const REASON=r=>{r=ASC(r);if(/momentum_already_spent/.test(r))return 'juz wycenione';if(/shape crowd/.test(r))return 'slaby tlum';if(/position already open/.test(r))return 'pozycja juz otwarta';if(/single survivor/.test(r))return 'tylko jeden kandydat';
  if(/0 survivors/.test(r))return '0 kandydatow po VET';return r.replace(/0x[0-9a-fA-F]{6,}|[1-9A-HJ-NP-Za-km-z]{30,}/g,'').slice(0,28);};
 const BOTS7=['SCAN','VET','BOOK','SIZE','FILLS','RISK','CHIEF'];
@@ -88,10 +89,11 @@ function botEvents(){const evs=[];const day=d=>new Date(d).toLocaleDateString('s
 function build(){const b0=build0();if(b0&&!b0.botEvents)b0.botEvents=botEvents();if(b0&&!b0.portfolio)b0.portfolio=portfolio(b0.positions);if(b0&&newsCache&&!b0.news)b0.news=newsCache;return b0;}
 function build0(){const f=path.join(DESK,'office-feed.json');const own=readJSON(f);
  if(own&&Array.isArray(own.positions)){return {...own,source:'office-feed.json'};}
- const b=readJSON(path.join(DESK,'board.json'));if(!b)return null;const positions=[];const p=b.position;
- if(p&&p.token){const hb=p.latest_heartbeat||{};positions.push({id:p.board_id||p.order_id,bot:'RISK',symbol:p.token,chain:p.chain,side:'LONG',size:p.ticket_usd??null,
+ const b=readJSON(path.join(DESK,'board.json'));if(!b)return null;const positions=[];
+ const plist=Array.isArray(b.positions)?b.positions:(b.position?[b.position]:[]); // up to 3 positions (Złotr 23:20)
+ for(const p of plist){if(!p||!p.token)continue;const hb=p.latest_heartbeat||{};positions.push({id:p.board_id||p.order_id,bot:'RISK',symbol:SYM(p.token,p.chain,p.address),chain:p.chain,side:'LONG',size:p.ticket_usd??null,
    entry:p.entry_priceUSD??null,price:hb.priceUSD??null,refPrice:p.reference_priceUSD??null,mode:(b.shadow||p.virtual)?'SHADOW':'REAL',openedAt:p.ts,status:p.risk_status||''});}
- for(const r of (b.runners||[])){const hb=r.latest_heartbeat||{};positions.push({id:'runner-'+String(r.order_id).replace(/[^A-Za-z0-9_-]/g,''),bot:'RISK',symbol:r.token,chain:r.chain,side:'LONG',
+ for(const r of (b.runners||[])){const hb=r.latest_heartbeat||{};positions.push({id:'runner-'+String(r.order_id).replace(/[^A-Za-z0-9_-]/g,''),bot:'RISK',symbol:SYM(r.token,r.chain,r.address),chain:r.chain,side:'LONG',
    size:r.ticket_usd??null,entry:r.entry_priceUSD??null,price:hb.priceUSD??r.half_close_price??null,mode:(b.shadow||r.virtual)?'SHADOW':'REAL',openedAt:r.runner_since||r.ts,
    status:'RUNNER ½ (połowa zamknięta '+(r.half_close_price??'')+'), '+(r.risk_status||'')});}
  const since=Date.now()-3*3600e3,acts=[];
