@@ -140,12 +140,12 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   save();io.emit('positions',allPositions());
   // activity -> chat + bubbles (+ errand when the bot is idle); first feed only marks history as seen
   const first=feedSeen.size===0;const fresh=[];
-  for(const a of (Array.isArray(acts)?acts.slice(-100):[])){if(!a)continue;const bot=String(a.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))continue;
+  for(const a of (Array.isArray(acts)?acts.slice(-200):[])){if(!a)continue;const bot=String(a.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))continue;
     const text=String(a.text||'').replace(/[<>]/g,'').slice(0,160);if(!text)continue;const ts=String(a.ts||'');const k=ts+'|'+bot+'|'+text;if(feedSeen.has(k))continue;feedSeen.add(k);
     const item={ts,bot,text,kind:String(a.kind||'').slice(0,40)};feedActivity.push(item);fresh.push(item);}
-  while(feedActivity.length>100)feedActivity.shift();if(feedSeen.size>5000)feedSeen.clear();
-  const announce=first?fresh.slice(-3):fresh.slice(-42); // Zlotr 2026-10-20 22:25: room for all 7 bots x 6 (was 6)res.activity=fresh.length;
-  announce.forEach((a,i)=>setTimeout(()=>{const tm=/^\d\d:\d\d /.test(a.text)?a.text.slice(0,6):'',bt=tm?a.text.slice(6):a.text;io.emit('chat',{system:true,text:`${tm}🤖 ${a.bot}: ${bt}`,scope:'global',ts:Date.now()});io.emit('bubble',{id:'bot-'+a.bot,text:bt});bots.nudge(a.bot);},i*(announce.length>6?800:2500)));
+  while(feedActivity.length>200)feedActivity.shift();if(feedSeen.size>5000)feedSeen.clear();
+  const announce=first?fresh.slice(-3):fresh.slice(-168); // Zlotr 2026-10-20 22:28: 7 bots x 24 (was 6)res.activity=fresh.length;
+  announce.forEach((a,i)=>setTimeout(()=>{const tm=/^\d\d:\d\d /.test(a.text)?a.text.slice(0,6):'',bt=tm?a.text.slice(6):a.text;io.emit('chat',{system:true,text:`${tm}🤖 ${a.bot}: ${bt}`,scope:'global',ts:Date.now()});io.emit('bubble',{id:'bot-'+a.bot,text:bt});bots.nudge(a.bot);},i*1500));
   if(b.top10&&Array.isArray(b.top10)&&b.top10.length){desk={...(desk||{}),top10:b.top10.slice(0,10),top10_cycle_ts:b.top10_cycle_ts,top10_rule:b.top10_rule,updatedAt:b.updatedAt};const t=deskTop10();if(t)io.emit('top10',t);}
   if(b.news&&typeof b.news==='object'&&Array.isArray(b.news.items)){const items=b.news.items.slice(0,20).map(x=>({title:String(x&&x.title||'').replace(/[<>]/g,'').slice(0,140),source:String(x&&x.source||'').replace(/[<>]/g,'').slice(0,40),category:String(x&&x.category||'').slice(0,20),publishedAt:+(x&&x.publishedAt)||null})).filter(x=>x.title);
     if(items.length){feedNews={items,updatedAt:Date.parse(b.news.updatedAt)||Date.now(),error:null,source:'feed:'+String(b.news.source||'desk').slice(0,30)};io.emit('ticker',tickerOut());}}
