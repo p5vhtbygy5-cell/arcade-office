@@ -136,7 +136,7 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   for(const p of clean){const old=positions[p.id];positions[p.id]=p;io.emit('position',p);
     if(!old){res.opened.push(p.id);botSay(p.bot,`Otwieram ${p.side} ${p.symbol}`);bots.onPosition('open',p);}else res.updated.push(p.id);}
   for(const p of Object.values(positions))if(p.feed&&!ids.has(p.id)){delete positions[p.id];io.emit('positionClosed',p.id);res.closed.push(p.id);
-    const b=p.pnlBase,pl=b&&p.price?(p.price-b)/b*100*(p.side==='LONG'?1:-1):null;botSay(p.bot,`Zamykam ${p.symbol}${pl!=null?` (${pl>=0?'+':''}${pl.toFixed(2)}%)`:''}`);bots.onPosition('close',p);}
+    const cr=(b.closeReasons&&typeof b.closeReasons=='object')?b.closeReasons[p.feedId]:null;const b0=p.pnlBase,pl0=b0&&p.price?(p.price-b0)/b0*100*(p.side==='LONG'?1:-1):null;const pl=cr&&fin(cr.pct)!=null?fin(cr.pct):pl0;const why=cr&&cr.reason?' - '+str(cr.reason,90):'';botSay(p.bot,`Zamykam ${p.symbol}${pl!=null?` (${pl>=0?'+':''}${pl.toFixed(2)}%)`:''}${why}`);bots.onPosition('close',p);}
   save();io.emit('positions',allPositions());
   // activity -> chat + bubbles (+ errand when the bot is idle); first feed only marks history as seen
   const first=feedSeen.size===0;const fresh=[];
