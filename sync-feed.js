@@ -6,7 +6,7 @@ const DESK=process.env.DESK_DIR||'/workspace/desk',LOG=path.join(__dirname,'sync
 const TARGETS=[{name:'render',url:process.env.FEED_URL||'https://arcade-office.onrender.com/api/feed',tokenFile:'/home/box/.arcade-bot-token',timeout:90000},
  {name:'local',url:process.env.LOCAL_FEED_URL||'http://localhost:3000/api/feed',tokenFile:process.env.LOCAL_TOKEN_FILE||path.join(__dirname,'.bot-token'),timeout:10000}]
  .filter(t=>!process.env.FEED_ONLY||process.env.FEED_ONLY.split(',').includes(t.name)); // FEED_ONLY=local -> push only to the local target
-const EVERY=60000,HEARTBEAT=5*60000,ONCE=process.argv.includes('--once'),DRY=process.argv.includes('--dry');
+const EVERY=600000,HEARTBEAT=5*60000,ONCE=process.argv.includes('--once'),DRY=process.argv.includes('--dry');
 const log=m=>{const l=new Date().toISOString().replace('T',' ').slice(0,19)+'Z '+m;fs.appendFileSync(LOG,l+'\n');if(ONCE||DRY)console.log(l);};
 const readJSON=f=>{try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch{return null;}};
 const ROLE_FILES=['scan','vet','book','size','fills','risk','chief'];
