@@ -118,7 +118,9 @@ function cleanPortfolio(p){if(!p||typeof p!=='object')return null;const tr=t=>t&
   return {start:fin(p.start)??1000,bank:fin(p.bank),realizedPnl:fin(p.realizedPnl),roiPct:fin(p.roiPct),trades:Math.max(0,fin(p.trades)|0),partial:Math.max(0,fin(p.partial)|0),closes:fin(p.closes)==null?null:Math.max(0,p.closes|0),tiers:Array.isArray(p.tiers)?[0,1,2].map(i=>Math.max(0,fin(p.tiers[i])|0)):null,openFull:fin(p.open_full)==null?null:Math.max(0,p.open_full|0),openTiers:Array.isArray(p.open_tiers)?[0,1,2].map(i=>Math.max(0,fin(p.open_tiers[i])|0)):null,wins:Math.max(0,fin(p.wins)|0),
    winRate:fin(p.winRate),maxDrawdownPct:fin(p.maxDrawdownPct),maxDrawdownUsd:fin(p.maxDrawdownUsd),best:tr(p.best),worst:tr(p.worst),mode:str(p.mode,8),updatedAt:str(p.updatedAt),receivedAt:Date.now(),
    series:(Array.isArray(p.series)?p.series:[]).slice(-500).map(x=>({ts:Date.parse(x&&x.ts)||null,bank:fin(x&&x.bank)})).filter(x=>x.ts&&x.bank!=null),
-   recent:(Array.isArray(p.recent)?p.recent:[]).slice(0,10).map(x=>({ts:Date.parse(x&&x.ts)||null,kind:x&&x.kind=='close'?'close':'open',token:str(x&&x.token,24),net:fin(x&&x.net),pct:fin(x&&x.pct),size:fin(x&&x.size),partial:!!(x&&x.partial),runner:!!(x&&x.runner),mode:str(x&&x.mode,8)})).filter(x=>x.token)};}const feedSeen=new Set(),feedActivity=[];
+   recent:(Array.isArray(p.recent)?p.recent:[]).slice(0,10).map(x=>({ts:Date.parse(x&&x.ts)||null,kind:x&&x.kind=='close'?'close':'open',token:str(x&&x.token,24),net:fin(x&&x.net),pct:fin(x&&x.pct),size:fin(x&&x.size),partial:!!(x&&x.partial),runner:!!(x&&x.runner),mode:str(x&&x.mode,8)})).filter(x=>x.token)};}const feedSeen=new Set(),feedActivity=[];let posEvents=[];
+// Zlotr 2026-10-22 00:20: position action feed (OPEN / SELL 1/4 / CLOSE) for the panel above the chat
+function cleanPosEvents(a){return (Array.isArray(a)?a:[]).slice(0,50).map(x=>({ts:Date.parse(x&&x.ts)||null,action:['OPEN','SELL','CLOSE'].includes(x&&x.action)?x.action:null,frac:str(x&&x.frac,5),token:str(x&&x.token,20),chain:str(x&&x.chain,16),usd:fin(x&&x.usd),price:fin(x&&x.price),pct:fin(x&&x.pct),net:fin(x&&x.net),reason:str(x&&x.reason,24)})).filter(x=>x.ts&&x.action&&x.token).sort((a,b)=>b.ts-a.ts);}
 const FEED_KIND_BOT={scan:'SCAN',vet:'VET',book:'BOOK',size:'SIZE',fills:'FILLS',risk:'RISK',chief:'CHIEF'};
 function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['body: obiekt JSON']};
   const ps=b.positions,acts=b.activity??[];if(!Array.isArray(ps))errs.push('positions: tablica');if(!Array.isArray(acts))errs.push('activity: tablica');
@@ -151,17 +153,18 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
     if(items.length){feedNews={items,updatedAt:Date.parse(b.news.updatedAt)||Date.now(),error:null,source:'feed:'+String(b.news.source||'desk').slice(0,30)};io.emit('ticker',tickerOut());}}
   if(b.botEvents&&typeof b.botEvents==='object'){const ev={};for(const n of BOT_NAMES){const l=b.botEvents[n];ev[n]=(Array.isArray(l)?l:[]).slice(0,10).map(x=>({ts:String(x&&x.ts||'').slice(0,40),
      text:String(x&&x.text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'').replace(/[<>]/g,'').replace(/0x[0-9a-fA-F]{6,}|[1-9A-HJ-NP-Za-km-z]{30,}/g,'').trim().slice(0,60)})).filter(x=>x.text);}bots.setEvents(ev);}
+  if(Array.isArray(b.posEvents)){posEvents=cleanPosEvents(b.posEvents);io.emit('posEvents',posEvents);}
   if(b.portfolio!==undefined){const pf=cleanPortfolio(b.portfolio);if(pf){portfolio=pf;io.emit('portfolio',portfolio);}}
   return res;}
 app.post('/api/feed',auth,(q,r)=>{const res=applyFeed(q.body);if(res.error)return r.status(400).json({error:'Błędne dane',details:res.error});r.json({ok:true,...res});});
-app.get('/api/feed',(q,r)=>r.json({lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:feedActivity.slice(-30)}));
+app.get('/api/feed',(q,r)=>r.json({lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:feedActivity.slice(-30),posEvents}));
 app.get('/api/bot-events',(q,r)=>r.json(bots.events()));
 app.get('/api/portfolio',(q,r)=>r.json(portfolio||{empty:true,trades:0,series:[],recent:[],note:'brak historii portfela (feed jeszcze nie przysłał danych)'}));
 app.get('/api/desk',(q,r)=>r.json(desk||{error:'brak board.json'}));
 io.on('connection',s=>{
   s.emit('top10',deskTop10()||top10);
   s.emit('positions',allPositions());
-  if(portfolio)s.emit('portfolio',portfolio);
+  if(portfolio)s.emit('portfolio',portfolio);s.emit('posEvents',posEvents);
   s.emit('ticker',tickerOut());
   s.emit('printer',{pile:bots.printer()});
   s.on('join',d=>{

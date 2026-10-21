@@ -103,8 +103,7 @@ socket.on('chat',m=>{const log=document.getElementById('log');const el=document.
   const n=document.createElement('b');n.textContent=m.name;el.append(t,n,document.createTextNode(': '+m.text));say(m.name,m.text,m.id);marks[m.id]=Date.now()+4000;speak(m.id,m.text);}
  log.appendChild(el);log.scrollTop=1e9;});
 socket.on('bubble',d=>{const p=players[d.id];say(p?p.name:'BOT',d.text,d.id);marks[d.id]=Date.now()+4000;speak(d.id,d.text);});
-function updOnline(){const ps=Object.values(players);document.getElementById('online').textContent='Online: '+ps.filter(p=>!p.bot).length+' + '+ps.filter(p=>p.bot).length+' boty';
- const pl=document.getElementById('plist');pl.innerHTML='';ps.sort((a,b)=>(a.bot-b.bot)||a.name.localeCompare(b.name)).forEach(p=>{const d=document.createElement('div');d.textContent=(p.bot?'■ ':'● ')+p.name+(p.id==me?' (ty)':'');if(p.bot){const t=document.createElement('span');t.className='b';t.textContent=' [BOT]'+(p.status?' – '+p.status.replace(p.name+': ',''):'');d.appendChild(t);}pl.appendChild(d);});}
+function updOnline(){const ps=Object.values(players);document.getElementById('online').textContent='Online: '+ps.filter(p=>!p.bot).length+' + '+ps.filter(p=>p.bot).length+' boty';}
 const tg=document.getElementById('tg'),tz=document.getElementById('tz');
 tg.onclick=()=>{scope='global';tg.className='on';tz.className='';};tz.onclick=()=>{scope='zone';tz.className='on';tg.className='';};
 const msg=document.getElementById('msg');
@@ -457,3 +456,15 @@ function loop(t){const dt=Math.min(.05,(t-last)/1000);last=t;update(dt);
  const p=players[me];if(p){const z=zoneAt(p.x,p.y);document.getElementById('zone').textContent='Strefa: '+ZN[z];if(z!=lastZone){if(z=='board')panel.classList.add('show');else if(lastZone=='board')panel.classList.remove('show');if(z=='top10')t10.classList.add('show');else if(lastZone=='top10')t10.classList.remove('show');lastZone=z;}}
  requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
+
+// Zlotr 2026-10-22 00:20: panel above the chat = feed of position actions (newest on top, last 50), Warsaw time
+const evP=v=>v==null?'?':v>=1?+v.toPrecision(6)+'':String(+v.toPrecision(4));
+const evU=v=>v==null?'?':'$'+(Math.round(v*100)/100);
+function renderPosEvents(evs){const el=document.getElementById('plist');if(!el)return;el.innerHTML='';
+ if(!evs||!evs.length){const d=document.createElement('div');d.className='b';d.textContent='brak zdarzen pozycji';el.appendChild(d);return;}
+ for(const e of evs.slice(0,50)){const d=document.createElement('div');const tm=new Date(e.ts).toLocaleTimeString('pl-PL',{timeZone:'Europe/Warsaw',hour:'2-digit',minute:'2-digit'});
+  const sg=v=>(v>=0?'+':'')+v;let t;
+  if(e.action=='OPEN'){t=`${tm} OPEN ${e.token} ${e.chain||'?'} ${evU(e.usd)} @${evP(e.price)}`;d.className='ev-o';}
+  else{t=`${tm} ${e.action=='SELL'?'SELL '+(e.frac||'1/4'):'CLOSE'} ${e.token} ${e.chain||'?'} ${evU(e.usd)} @${evP(e.price)} ${e.reason||''} ${e.pct!=null?sg(e.pct.toFixed(1))+'%':''} ${e.net!=null?(e.net>=0?'+$':'-$')+Math.abs(e.net).toFixed(2):''}`.replace(/\s+/g,' ').trim();d.className=e.net==null?'ev-o':e.net>=0?'ev-p':'ev-l';}
+  d.textContent=t;el.appendChild(d);}}
+socket.on('posEvents',renderPosEvents);renderPosEvents([]);
