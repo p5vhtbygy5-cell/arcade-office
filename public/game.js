@@ -402,7 +402,7 @@ function drawHistory(X,Y,w,h,t){frame(X,Y,w,h);const pf=portfolio;screenHead(X,Y
  s.forEach(p=>R(px(p.ts)-1,py(p.bank)-1,3,3,'#ffd890'));
  tt(new Date(t0).toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'}),cx,cy+ch+2,C[1]);
  const L=[['BANK',usd(pf.bank),NX],['PNL',(pf.realizedPnl>=0?'+':'-')+'$'+Math.abs(pf.realizedPnl).toFixed(2),pf.realizedPnl>=0?NEON.cyan:NEON.mag],['ROI',pf.roiPct==null?'-':sg(pf.roiPct)+'%',(pf.roiPct||0)>=0?NEON.cyan:NEON.mag],
-  ['WIN',pf.winRate==null?'-':pf.winRate.toFixed(0)+'%',NX],['TRADES',Array.isArray(pf.tiers)?[[String(pf.closes??pf.trades),NX],['(','#3ccf6e'],[String(pf.tiers[0]),'#1e9e4a'],[',','#3ccf6e'],[String(pf.tiers[1]),'#3ccf6e'],[',','#3ccf6e'],[String(pf.tiers[2]),'#8ef0ad'],[')','#3ccf6e']]:String(pf.trades),NX],['MAX DD',pf.maxDrawdownPct==null?'-':'-'+pf.maxDrawdownPct.toFixed(1)+'%',NX],
+  ['WIN',pf.winRate==null?'-':pf.winRate.toFixed(0)+'%',NX],['TRADES',Array.isArray(pf.openTiers)?[[String(pf.openFull??0),NX],['(','#3ccf6e'],[String(pf.openTiers[0]),'#1e9e4a'],[',','#3ccf6e'],[String(pf.openTiers[1]),'#3ccf6e'],[',','#3ccf6e'],[String(pf.openTiers[2]),'#8ef0ad'],[')','#3ccf6e']]:String(pf.trades),NX],['MAX DD',pf.maxDrawdownPct==null?'-':'-'+pf.maxDrawdownPct.toFixed(1)+'%',NX],
   ['NAJL',pf.best?sg(pf.best.net):'-',NEON.cyan],['NAJG',pf.worst?sg(pf.worst.net):'-',(pf.worst&&pf.worst.net<0)?NEON.mag:NEON.cyan]];
  L.forEach(([k,v,c],i)=>{const yy=cy-1+i*8;tt(k,sx,yy,C[3]);if(Array.isArray(v)){const segs=[v[0],[' ',NX],...v.slice(1)];let x=X+w-4-(segs.reduce((a,[s])=>a+tw(s)+1,0)-1);for(const [s,cc] of segs){tt(s,x,yy,cc);x+=tw(s)+1;}}else tt(v,X+w-tw(v)-4,yy,c);});}
 socket.on('portfolio',d=>{if(d&&typeof d=='object')portfolio=d;});
