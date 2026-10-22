@@ -386,12 +386,19 @@ const STG4={order:'ORDR',order_blocked:'BLOK',soft_pass:'SOF+',soft_reject:'SOF-
 const mc5=v=>v==null||!isFinite(v)||v<=0?'-':v>=1e7?'$'+Math.round(v/1e6)+'M':v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+Math.round(v/1e3)+'K';
 const TOPN=12,TCOL=[0,9,35,53,74],THW=92;
 const pct1h=v=>v==null||!isFinite(v)?'-':(v<0?'-':'+')+(Math.abs(v)>=999?'1K':Math.abs(v)>=99.5?Math.round(Math.abs(v)):Math.round(Math.abs(v))+'%');
+// Zlotr 2026-10-22 22:59: 4-px-tall variant of the 3x5 pixel font (per glyph: drop an empty edge row, else a duplicate row, else merge the most similar pair) so TOP DESK rows at 5 px pitch get a 1 px gap
+const G4={};function g4(g){if(G4[g])return G4[g];const r=[0,1,2,3,4].map(i=>g.slice(i*3,i*3+3));let o;const sub=(a,b)=>[...a].every((x,i)=>x=='0'||b[i]=='1');
+ if(r[0]=='000')o=r.slice(1);else if(r[4]=='000')o=r.slice(0,4);else{let d=[1,2,3,0].find(i=>r[i]==r[i+1]);
+  if(d==null)d=[1,2,0,3].find(i=>sub(r[i],r[i+1])||sub(r[i+1],r[i]));if(d==null)d=1;
+  const m=[...r[d]].map((x,i)=>x=='1'||r[d+1][i]=='1'?'1':'0').join('');o=[...r.slice(0,d),m,...r.slice(d+2)];}
+ return G4[g]=o.join('');}
+function tt4(s,x,y,c=0){s=String(s).toUpperCase();ctx.fillStyle=col(c);for(let k=0;k<s.length;k++){const g=g4(G[DIA[s[k]]||s[k]]||G['?']);for(let i=0;i<12;i++)if(g[i]=='1')ctx.fillRect(x+k*4+i%3,y+(i/3|0),1,1);}}
 function topTable(hx,Y,items,label,ts,t){const chip=label+' '+hhmm(ts),cw=tw(chip)+4,cx=hx+(THW-cw>>1);R(cx,Y+3,cw,7,C[2]);tt(chip,cx+2,Y+4,0);R(hx,Y+11,THW,1,C[1]);
- for(let i=0;i<TOPN;i++){const yy=Y+13+i*5,c=items&&items[i];if(i%2){ctx.fillStyle='rgba(255,255,255,0.13)';ctx.fillRect(hx,yy,THW,5);}
+ for(let i=0;i<TOPN;i++){const yy=Y+14+i*5,c=items&&items[i];if(i%2){ctx.fillStyle='rgba(255,255,255,0.13)';ctx.fillRect(hx,yy-1,THW,5);}
   const rk=String(i+1),rx=hx+TCOL[0]+(rk.length<2?4:0);
-  if(!c){tt(rk,rx,yy,C[1]);tt('-',hx+TCOL[1],yy,C[1]);continue;}
-  const ch=c.change1h,up=(ch||0)>=0;tt(rk,rx,yy,C[3]);tt(String(c.symbol).slice(0,6),hx+TCOL[1],yy,NX);tt(pct1h(ch),hx+TCOL[2],yy,ch==null?C[1]:up?NEON.cyan:NEON.mag);
-  tt(mc5(c.marketCap),hx+TCOL[3],yy,NX);tt((STG4[c.stage]||String(c.stage||'-')).slice(0,4),hx+TCOL[4],yy,C[3]);}}
+  if(!c){tt4(rk,rx,yy,C[1]);tt4('-',hx+TCOL[1],yy,C[1]);continue;}
+  const ch=c.change1h,up=(ch||0)>=0;tt4(rk,rx,yy,C[3]);tt4(String(c.symbol).slice(0,6),hx+TCOL[1],yy,NX);tt4(pct1h(ch),hx+TCOL[2],yy,ch==null?C[1]:up?NEON.cyan:NEON.mag);
+  tt4(mc5(c.marketCap),hx+TCOL[3],yy,NX);tt4((STG4[c.stage]||String(c.stage||'-')).slice(0,4),hx+TCOL[4],yy,C[3]);}}
 function drawTop10(X,Y,w,h,t){frame(X,Y,w,h);const desk=top10.source=='desk';
  if(!desk){screenHead(X,Y,w,'TOP 12 KRYPTO',hhmm(top10.updatedAt),t);(top10.items||[]).slice(0,TOPN).forEach((c,i)=>{const yy=Y+13+i*5,up=(c.change24h||0)>=0;
    [String(c.rank||i+1),c.symbol.slice(0,6),(up?'+':'-')+Math.abs(c.change24h||0).toFixed(1)+'%',fmtUsd(c.price)].forEach((s,j)=>tt(s,X+[3,13,41,67][j],yy,j==2?(up?NEON.cyan:NEON.mag):NX));});return;}
