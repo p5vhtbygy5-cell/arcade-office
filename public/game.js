@@ -98,8 +98,17 @@ socket.on('playerMoved',d=>{const p=players[d.id];if(p){Object.assign(p,d);p.las
 socket.on('botState',d=>{const p=players[d.id];if(p){p.status=d.status;p.act=d.act;p.carry=d.carry;if(p.act=='walk')p.lastMove=performance.now();updOnline();}});
 socket.on('playerLeft',id=>{delete players[id];updOnline();});
 socket.on('correct',d=>{const p=players[me];if(p){p.x=p.rx=d.x;p.y=p.ry=d.y;}});
+// Zlotr 2026-10-22 22:52: bot chat lines - time + bot name in a fixed per-bot colour, token ticker red when its % is negative, green when positive
+const BOT_COL={SCAN:'#ffe14d',VET:'#4de1ff',BOOK:'#c58cff',SIZE:'#ff8ad8',FILLS:'#ffb347',FILL:'#ffb347',RISK:'#7fb2ff',CHIEF:'#f5ecc8',SOCIAL:'#b8a890'},BOT_COL_DEF='#b8a890';
+const TOK_RE=/^((?:Pilnuje|Zamykam|Otwieram|Kupuj[eę]|Trzymam|Sprzedaj[eę](?:\s+\d\/\d)?|Sprzedałem(?:\s+\d\/\d)?|Zamknąłem|Otworzyłem)\s+)([A-Za-z0-9$._\-]{1,24})/;
+function sysLine(el,m){const sp=(s,c)=>{const e=document.createElement('span');e.textContent=s;if(c)e.style.color=c;return e;};
+ const r=/^(\d\d:\d\d )?🤖 ([A-Za-z_]+): ([\s\S]*)$/.exec(m.text||'');if(!r){el.textContent='» '+m.text;return;}
+ const bot=String(m.bot||r[2]).toUpperCase(),bc=BOT_COL[bot]||BOT_COL_DEF,body=r[3];el.append('» ',sp((r[1]||'')+'🤖 '+r[2],bc),': ');
+ const k=TOK_RE.exec(body);if(!k){el.append(body);return;}
+ const rest=body.slice(k[0].length),pm=/([+\-−])\s?(\d+(?:[.,]\d+)?)\s?%/.exec(rest),v=pm?(pm[1]=='+'?1:-1)*parseFloat(pm[2].replace(',','.')):0;
+ el.append(k[1],sp(k[2],v>0?'#3dff7a':v<0?'#ff4d4d':null),rest);}
 socket.on('chat',m=>{const log=document.getElementById('log');const el=document.createElement('div');
- if(m.system){el.className='sys';el.textContent='» '+m.text;}else{const t=document.createElement('span');t.className='tag';t.textContent=m.scope=='zone'?'['+(ZN[m.zone]||m.zone)+'] ':'[GLOBAL] ';
+ if(m.system){el.className='sys';sysLine(el,m);}else{const t=document.createElement('span');t.className='tag';t.textContent=m.scope=='zone'?'['+(ZN[m.zone]||m.zone)+'] ':'[GLOBAL] ';
   const n=document.createElement('b');n.textContent=m.name;el.append(t,n,document.createTextNode(': '+m.text));say(m.name,m.text,m.id);marks[m.id]=Date.now()+4000;speak(m.id,m.text);}
  log.appendChild(el);log.scrollTop=1e9;});
 socket.on('bubble',d=>{const p=players[d.id];say(p?p.name:'BOT',d.text,d.id);marks[d.id]=Date.now()+4000;speak(d.id,d.text);});
