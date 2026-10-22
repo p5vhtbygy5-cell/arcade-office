@@ -372,19 +372,22 @@ const fmtUsd=v=>'$'+(v>=1000?Math.round(v).toLocaleString('en-US'):v>=1?v.toFixe
 const hhmm=ts=>ts?new Date(ts).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}):'--:--';
 const fmtK=v=>!isFinite(v)||v==null?'-':v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+(v/1e3).toFixed(0)+'K';
 const STG={order:'ORDER',order_blocked:'BLOCK',soft_pass:'SOFT+',soft_reject:'SOFT-',soft_missing:'SOFT?',hard_reject:'HARD-',not_enriched:'HARD~',cheap_reject:'CHEAP-'};
-// Screen 1: Top 10 desk (compact, left) + ostatnie pozycje (right)
-function drawTop10(X,Y,w,h,t){frame(X,Y,w,h);const desk=top10.source=='desk';screenHead(X,Y,w,desk?'TOP 10 DESK':'TOP 10 KRYPTO',hhmm(top10.updatedAt),t);
- const L=112;R(X+L,Y+12,1,h-15,C[1]);
- const cols=desk?[3,13,41,59,83]:[3,13,41,67,0];tt(desk?'# SYM 1H MC ETAP':'# SYM 24H CENA',X+w/2-40,Y+4,C[1]);R(X+3,Y+11,L-5,1,C[1]);
- if(!top10.items.length){if((t/600|0)%2)tt('BRAK DANYCH',X+20,Y+40,NX);}
- else top10.items.slice(0,10).forEach((c,i)=>{const yy=Y+14+i*6,ch=desk?c.change1h:c.change24h,up=(ch||0)>=0;
-  const v=desk?[String(c.rank),c.symbol.slice(0,6),ch==null?'-':(up?'+':'')+ch.toFixed(0)+'%',fmtK(c.marketCap),(STG[c.stage]||String(c.stage||'')).slice(0,6)]:[String(c.rank||i+1),c.symbol.slice(0,6),(up?'+':'-')+Math.abs(ch||0).toFixed(1)+'%',fmtUsd(c.price)];
-  v.forEach((s,j)=>tt(s,X+cols[j],yy,j==2?(up?NEON.cyan:NEON.mag):NX));});
- const rx=X+L+4;tt('OSTATNIE',rx,Y+13,C[3]);R(rx,Y+19,w-L-7,1,C[1]);const rc=(portfolio&&portfolio.recent)||[];
- if(!rc.length){tt('BRAK',rx,Y+24,NX);tt('HISTORII',rx,Y+31,NX);return;}
- rc.slice(0,4).forEach((r,i)=>{const yy=Y+22+i*13;tt(r.token.replace(/ .*/,'').slice(0,9),rx,yy,NX);
-  const s=r.kind=='close'?(r.partial?'1/2 ':'ZAM ')+(r.net>=0?'+':'-')+'$'+Math.abs(r.net).toFixed(0):(r.runner?'RUNNER':'OTW')+(r.size!=null?' $'+Math.round(r.size):'');
-  tt(s,rx,yy+6,r.kind=='close'?(r.net>=0?NEON.cyan:NEON.mag):C[3]);});}
+// Screen 1 (Zlotr 2026-10-22 22:39): two identical TOP 12 tables side by side - left = current SCAN batch, right = previous batch (OSTATNIE removed, it is above the chat)
+const STG4={order:'ORDR',order_blocked:'BLOK',soft_pass:'SOF+',soft_reject:'SOF-',soft_missing:'SOF?',hard_reject:'HRD-',not_enriched:'HRD~',cheap_reject:'CHP-',cooldown_skip:'COOL',repeat_skip:'REPT',held_skip:'HELD',filled:'FILL',picked:'PICK'};
+const mc5=v=>v==null||!isFinite(v)||v<=0?'-':v>=1e7?'$'+Math.round(v/1e6)+'M':v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+Math.round(v/1e3)+'K';
+const TOPN=12,TCOL=[0,9,35,53,74],THW=92;
+const pct1h=v=>v==null||!isFinite(v)?'-':(v<0?'-':'+')+(Math.abs(v)>=999?'1K':Math.abs(v)>=99.5?Math.round(Math.abs(v)):Math.round(Math.abs(v))+'%');
+function topTable(hx,Y,items,label,ts,t){const chip=label+' '+hhmm(ts),cw=tw(chip)+4,cx=hx+(THW-cw>>1);R(cx,Y+3,cw,7,C[2]);tt(chip,cx+2,Y+4,0);R(hx,Y+11,THW,1,C[1]);
+ for(let i=0;i<TOPN;i++){const yy=Y+13+i*5,c=items&&items[i];if(i%2){ctx.fillStyle='rgba(255,255,255,0.13)';ctx.fillRect(hx,yy,THW,5);}
+  const rk=String(i+1),rx=hx+TCOL[0]+(rk.length<2?4:0);
+  if(!c){tt(rk,rx,yy,C[1]);tt('-',hx+TCOL[1],yy,C[1]);continue;}
+  const ch=c.change1h,up=(ch||0)>=0;tt(rk,rx,yy,C[3]);tt(String(c.symbol).slice(0,6),hx+TCOL[1],yy,NX);tt(pct1h(ch),hx+TCOL[2],yy,ch==null?C[1]:up?NEON.cyan:NEON.mag);
+  tt(mc5(c.marketCap),hx+TCOL[3],yy,NX);tt((STG4[c.stage]||String(c.stage||'-')).slice(0,4),hx+TCOL[4],yy,C[3]);}}
+function drawTop10(X,Y,w,h,t){frame(X,Y,w,h);const desk=top10.source=='desk';
+ if(!desk){screenHead(X,Y,w,'TOP 12 KRYPTO',hhmm(top10.updatedAt),t);(top10.items||[]).slice(0,TOPN).forEach((c,i)=>{const yy=Y+13+i*5,up=(c.change24h||0)>=0;
+   [String(c.rank||i+1),c.symbol.slice(0,6),(up?'+':'-')+Math.abs(c.change24h||0).toFixed(1)+'%',fmtUsd(c.price)].forEach((s,j)=>tt(s,X+[3,13,41,67][j],yy,j==2?(up?NEON.cyan:NEON.mag):NX));});return;}
+ valves(X,Y,w,t);const hx0=X+3,hx1=X+w-3-THW;R(X+(w>>1),Y+3,1,h-6,C[1]);
+ topTable(hx0,Y,top10.items,'TERAZ',top10.updatedAt,t);topTable(hx1,Y,top10.prev&&top10.prev.items,'POPRZ',top10.prev&&top10.prev.updatedAt,t);}
 const drawDeskTop10=drawTop10;
 // Screen 3: Historia portfela (real data from the feed; honest empty state)
 let portfolio=null;
@@ -407,7 +410,7 @@ function drawHistory(X,Y,w,h,t){frame(X,Y,w,h);const pf=portfolio;screenHead(X,Y
 socket.on('portfolio',d=>{if(d&&typeof d=='object')portfolio=d;});
 const t10=document.getElementById('top10');
 function renderTop10(){const hd=document.querySelector('#top10 thead tr'),ttl=document.querySelector('#top10 .bh span');
- if(top10.source=='desk'){ttl.textContent='🏆 TOP 10 DESK (ostatni cykl)';hd.innerHTML='<th>#</th><th>Ticker</th><th>Chain</th><th>MC</th><th>Płynność</th><th>1h %</th><th>Etap / powód</th>';
+ if(top10.source=='desk'){ttl.textContent='🏆 TOP 12 DESK (ostatni cykl)';hd.innerHTML='<th>#</th><th>Ticker</th><th>Chain</th><th>MC</th><th>Płynność</th><th>1h %</th><th>Etap / powód</th>';
   document.getElementById('t10upd').textContent='cykl: '+new Date(top10.updatedAt).toLocaleString('pl-PL')+' · '+(top10.rule||'');const tb=document.getElementById('t10body');tb.innerHTML='';
   for(const c of top10.items){const tr=document.createElement('tr');const up=(c.change1h||0)>=0;
    [c.rank,c.symbol,c.chain,fmtK(c.marketCap),fmtK(c.liquidity),c.change1h==null?'-':(up?'▲ ':'▼ ')+Math.abs(c.change1h).toFixed(2)+'%',(STG[c.stage]||c.stage)+(c.reason?' · '+c.reason:'')].forEach((v,i)=>{const td=document.createElement('td');td.textContent=v;if(i==5&&c.change1h!=null)td.className=up?'pos':'neg';if(i==6)td.style.whiteSpace='normal';tr.appendChild(td);});tb.appendChild(tr);}return;}

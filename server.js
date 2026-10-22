@@ -104,9 +104,11 @@ function deskPosition(){const p=desk&&desk.position;if(!p)return null;const hb=p
     pnlBase:ref,movePct:p.move_vs_ref_pct,chain:p.chain,orderId:p.order_id,risk:p.risk_status,
     note:`${p.chain} · order ${p.order_id} · entry ${p.entry_priceUSD??'brak'} · ref ${p.reference_priceUSD??'-'} · ${p.risk_status}`,openedAt:Date.parse(p.ts)||Date.now(),updatedAt:Date.parse(desk.updatedAt)||Date.now()};}
 const allPositions=()=>{const d=Date.now()-lastFeedAt<15*60000?null:deskPosition();return d?[d,...Object.values(positions)]:Object.values(positions);};
+const deskItems=l=>l.slice(0,12).map((c,i)=>({rank:i+1,symbol:String(c.ticker),name:c.chain,chain:c.chain,price:c.priceUSD,marketCap:c.marketCap,liquidity:c.liquidity,change1h:c.change_1h,change24h:c.change_1h,stage:c.stage,reason:c.reason}));
+// Zlotr 2026-10-22 22:39: top 12 + previous SCAN batch (top10_prev from sync-feed) for the second TOP DESK table
 function deskTop10(){if(!desk||!Array.isArray(desk.top10)||!desk.top10.length)return null;
-  return {updatedAt:Date.parse(desk.top10_cycle_ts||desk.updatedAt)||Date.now(),source:'desk',rule:desk.top10_rule,
-    items:desk.top10.map((c,i)=>({rank:i+1,symbol:String(c.ticker),name:c.chain,chain:c.chain,price:c.priceUSD,marketCap:c.marketCap,liquidity:c.liquidity,change1h:c.change_1h,change24h:c.change_1h,stage:c.stage,reason:c.reason}))};}
+  const pv=Array.isArray(desk.top10_prev)&&desk.top10_prev.length?{updatedAt:Date.parse(desk.top10_prev_cycle_ts)||null,items:deskItems(desk.top10_prev)}:null;
+  return {updatedAt:Date.parse(desk.top10_cycle_ts||desk.updatedAt)||Date.now(),source:'desk',rule:desk.top10_rule,items:deskItems(desk.top10),prev:pv};}
 function readDesk(){try{const m=fs.statSync(DESK_BOARD).mtimeMs;if(m===deskMtime)return;deskMtime=m;desk=JSON.parse(fs.readFileSync(DESK_BOARD,'utf8'));
   io.emit('positions',allPositions());const t=deskTop10();if(t)io.emit('top10',t);}catch{}}
 readDesk();setInterval(readDesk,15000);
@@ -148,7 +150,7 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   while(feedActivity.length>200)feedActivity.shift();if(feedSeen.size>5000)feedSeen.clear();
   const announce=first?fresh.slice(-3):fresh.slice(-168); // Zlotr 2026-10-20 22:28: 7 bots x 24 (was 6)res.activity=fresh.length;
   announce.forEach((a,i)=>setTimeout(()=>{const tm=/^\d\d:\d\d /.test(a.text)?a.text.slice(0,6):'',bt=tm?a.text.slice(6):a.text;io.emit('chat',{system:true,text:`${tm}🤖 ${a.bot}: ${bt}`,scope:'global',ts:Date.now()});io.emit('bubble',{id:'bot-'+a.bot,text:bt});bots.nudge(a.bot);},i*1500));
-  if(b.top10&&Array.isArray(b.top10)&&b.top10.length){desk={...(desk||{}),top10:b.top10.slice(0,10),top10_cycle_ts:b.top10_cycle_ts,top10_rule:b.top10_rule,updatedAt:b.updatedAt};const t=deskTop10();if(t)io.emit('top10',t);}
+  if(b.top10&&Array.isArray(b.top10)&&b.top10.length){desk={...(desk||{}),top10:b.top10.slice(0,12),top10_cycle_ts:b.top10_cycle_ts,top10_prev:Array.isArray(b.top10_prev)?b.top10_prev.slice(0,12):null,top10_prev_cycle_ts:b.top10_prev_cycle_ts||null,top10_rule:b.top10_rule,updatedAt:b.updatedAt};const t=deskTop10();if(t)io.emit('top10',t);}
   if(b.news&&typeof b.news==='object'&&Array.isArray(b.news.items)){const items=b.news.items.slice(0,20).map(x=>({title:String(x&&x.title||'').replace(/[<>]/g,'').slice(0,140),source:String(x&&x.source||'').replace(/[<>]/g,'').slice(0,40),category:String(x&&x.category||'').slice(0,20),publishedAt:+(x&&x.publishedAt)||null})).filter(x=>x.title);
     if(items.length){feedNews={items,updatedAt:Date.parse(b.news.updatedAt)||Date.now(),error:null,source:'feed:'+String(b.news.source||'desk').slice(0,30)};io.emit('ticker',tickerOut());}}
   if(b.botEvents&&typeof b.botEvents==='object'){const ev={};for(const n of BOT_NAMES){const l=b.botEvents[n];ev[n]=(Array.isArray(l)?l:[]).slice(0,10).map(x=>({ts:String(x&&x.ts||'').slice(0,40),
