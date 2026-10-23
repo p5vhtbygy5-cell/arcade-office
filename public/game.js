@@ -389,12 +389,18 @@ function drawTicker(t){drawStrip(1,'WIADOMOSCI SWIAT',newsSegs(),26,t,1);drawStr
 function screenHead(X,Y,w,ttl,right,t){valves(X,Y,w,t);R(X+3,Y+3,tw(ttl)+4,7,C[2]);tt(ttl,X+5,Y+4,0);if(right)tt(right,X+w-tw(right)-4,Y+4,C[3]);}
 const usd=v=>v==null?'-':(v<0?'-':'')+'$'+Math.abs(v).toFixed(2),sg=v=>v==null?'-':(v>=0?'+':'')+v.toFixed(2);
 const fin1=v=>typeof v=='number'&&isFinite(v)?(v>0?'+':'')+v.toFixed(1)+'%':'-';
+// Zlotr 2026-10-23 21:34: board cols MCAP/6H/PASS (1H kept; CENA/AKT removed)
+const fmtMcap=v=>v==null||!isFinite(v)||v<=0?'-':v>=1e9?'$'+(v/1e9).toFixed(1)+'B':v>=1e6?'$'+(v/1e6).toFixed(v>=1e7?0:1)+'M':v>=1e3?'$'+(v/1e3).toFixed(0)+'K':'$'+Math.round(v);
+const pctCh=v=>v==null||!isFinite(v)?'-':(v<0?'-':'+')+(Math.abs(v)>=999?'1K':Math.abs(v)>=99.5?String(Math.round(Math.abs(v))):Math.abs(v).toFixed(Math.abs(v)>=10?0:1));
+function passSegs(pass){const n=(pass&&pass.n)|0,w=(pass&&pass.wins)|0,l=(pass&&pass.losses)|0;if(!n)return[['0','#ffffff']];return[[String(n),'#ffffff'],['(','#ffffff'],[String(w),'#3dff7a'],[',','#ffffff'],[String(l),'#ff4d4d'],[')','#ffffff']];}
 function drawScoreboard(X,Y,w,h,t){frame(X,Y,w,h);screenHead(X,Y,w,'TABLICA POZYCJI',hhmm(Date.now()),t);
- const cols=[4,48,78,112,146,172];['SYMBOL','KIER','CENA','AKT','PNL%','1H'].forEach((c,i)=>tt(c,X+cols[i],Y+13,C[3]));R(X+3,Y+19,w-6,1,C[1]);
+ // Zlotr 2026-10-23 21:34: SYMBOL KIER PNL% 1H 6H MCAP PASS (CENA/AKT removed; 6H after 1H)
+ const cols=[3,42,70,98,122,148,172];['SYMBOL','KIER','PNL%','1H','6H','MCAP','PASS'].forEach((c,i)=>tt(c,X+cols[i],Y+13,C[3]));R(X+3,Y+19,w-6,1,C[1]);
  const ps=Object.values(positions);if(!ps.length){if((t/600|0)%2)tt('BRAK OTWARTYCH POZYCJI',X+w/2-tw('BRAK OTWARTYCH POZYCJI')/2,Y+40,NX);return;}
- const n=10;ps.sort((a,b)=>b.openedAt-a.openedAt).slice(0,n).forEach((p,i)=>{const yy=Y+22+i*5,pl=pnl(p);
-  [((p.tiers>=1&&p.tiers<=3)?(4-p.tiers)+'/4 ':'')+p.symbol.slice(0,9),(p.side=='LONG'?'▲':'▼')+p.side,p.entry!=null?fmtP(p.entry):(p.ref!=null?'~'+fmtP(p.ref):'-'),p.price!=null?fmtP(p.price):'-',pctS(pl),fin1(p.h1)]
-   .forEach((v,j)=>tt(String(v).slice(0,j==0?10:8),X+cols[j],yy,j==5?(p.h1==null||p.h1==0?NX:p.h1>0?'#3ccf6e':'#ff4d4d'):j==1&&p.side=='SHORT'||j==4&&pl<0?NEON.mag:j==1||j==4?NEON.cyan:NX));});
+ const n=10;ps.sort((a,b)=>b.openedAt-a.openedAt).slice(0,n).forEach((p,i)=>{const yy=Y+22+i*5,pl=pnl(p);const h6=p.h6??p.change6h;
+  const cells=[((p.tiers>=1&&p.tiers<=3)?(4-p.tiers)+'/4 ':'')+p.symbol.slice(0,8),(p.side=='LONG'?'▲':'▼')+p.side.slice(0,1),pctS(pl),pctCh(p.h1),pctCh(h6),fmtMcap(p.mcap)];
+  cells.forEach((v,j)=>{const col=j==2?(pl<0?NEON.mag:NEON.cyan):j==3?(p.h1==null||p.h1==0?NX:p.h1>0?'#3ccf6e':'#ff4d4d'):j==4?(h6==null||h6==0?NX:h6>0?'#3ccf6e':'#ff4d4d'):j==1&&p.side=='SHORT'?NEON.mag:j==1?NEON.cyan:NX;tt(String(v).slice(0,j==0?9:j==5?7:6),X+cols[j],yy,col);});
+  let px=X+cols[6];for(const [tx,cc] of passSegs(p.pass)){tt(tx,px,yy,cc);px+=tw(tx)+1;}});
  if(ps.length>n)tt('+'+(ps.length-n)+' WIECEJ',X+w-48,Y+h-7,C[1]);}
 let top10={items:[]};
 const fmtCap=v=>!isFinite(v)||v<=0?'-':v>=1e12?'$'+(v/1e12).toFixed(2)+'T':v>=1e9?'$'+(v/1e9).toFixed(1)+'B':'$'+(v/1e6).toFixed(0)+'M';
@@ -467,10 +473,20 @@ socket.on('position',p=>{positions[p.id]=p;renderTable();});
 socket.on('positionClosed',id=>{delete positions[id];renderTable();});
 const panel=document.getElementById('board');
 function renderTable(){const tb=document.getElementById('btbody');tb.innerHTML='';const ps=Object.values(positions).sort((a,b)=>b.openedAt-a.openedAt);
- if(!ps.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center">Brak otwartych pozycji</td></tr>';return;}
- for(const p of ps){const tr=document.createElement('tr');const pl=pnl(p);tr.className=p.side=='LONG'?'long':'short';
-  [p.symbol+(p.desk&&p.chain?' ('+p.chain+')':''),(p.side=='LONG'?'▲ ':'▼ ')+p.side,p.desk?'$'+p.size:p.size,p.entry!=null?fmtP(p.entry):(p.desk?'brak (ref '+(p.ref!=null?fmtP(p.ref):'-')+')':'-'),(p.price!=null?fmtP(p.price):'-')+(p.priceSource=='live'?' •':'')+(p.desk&&p.priceTs?' @'+new Date(p.priceTs).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}):''),pctS(pl)+'%'+(p.desk&&p.entry==null?' vs ref':''),p.desk?'RISK: '+(p.risk||''):p.bot,new Date(p.openedAt).toLocaleString('pl-PL',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})]
-  .forEach((v,i)=>{const td=document.createElement('td');td.textContent=v;if(i==5)td.className=pl>=0?'pos':'neg';if(p.note&&i==0)td.title=p.note;tr.appendChild(td);});tb.appendChild(tr);}}
+ if(!ps.length){tb.innerHTML='<tr><td colspan="10" style="text-align:center">Brak otwartych pozycji</td></tr>';return;}
+ for(const p of ps){const tr=document.createElement('tr');const pl=pnl(p);tr.className=p.side=='LONG'?'long':'short';const h6=p.h6??p.change6h;
+  const mk=(txt,cls)=>{const td=document.createElement('td');if(cls)td.className=cls;if(Array.isArray(txt)){txt.forEach(([t,c])=>{const sp=document.createElement('span');sp.textContent=t;if(c)sp.style.color=c;td.appendChild(sp);});}else td.textContent=txt;return td;};
+  tr.appendChild(mk(p.symbol+(p.desk&&p.chain?' ('+p.chain+')':'')));if(p.note)tr.firstChild.title=p.note;
+  tr.appendChild(mk((p.side=='LONG'?'▲ ':'▼ ')+p.side));
+  tr.appendChild(mk(p.desk?'$'+p.size:String(p.size??'-')));
+  tr.appendChild(mk(pctS(pl)+'%'+(p.desk&&p.entry==null?' vs ref':''),pl>=0?'pos':'neg'));
+  tr.appendChild(mk(p.h1==null||!isFinite(p.h1)?'-':pctCh(p.h1),(p.h1==null||p.h1==0)?'':(p.h1>0?'pos':'neg')));
+  tr.appendChild(mk(h6==null||!isFinite(h6)?'-':pctCh(h6),(h6==null||h6==0)?'':(h6>0?'pos':'neg')));
+  tr.appendChild(mk(fmtMcap(p.mcap)));
+  tr.appendChild(mk(passSegs(p.pass)));
+  tr.appendChild(mk(p.desk?'RISK: '+(p.risk||p.status||''):p.bot));
+  tr.appendChild(mk(new Date(p.openedAt).toLocaleString('pl-PL',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})));
+  tb.appendChild(tr);}}
 document.getElementById('tb').onclick=()=>panel.classList.toggle('show');document.getElementById('bclose').onclick=()=>panel.classList.remove('show');
 // ---- players ----
 function drawPlayer(p,t){p.rx+=(p.x-p.rx)*.3;p.ry+=(p.y-p.ry)*.3;const x=Math.round(p.rx)-8,y=Math.round(p.ry)-12;

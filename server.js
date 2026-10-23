@@ -132,9 +132,10 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
     const size=p.size==null?null:pos(p.size),entry=p.entry==null?null:pos(p.entry),price=p.price==null?null:pos(p.price),ref=p.refPrice==null?null:pos(p.refPrice);
     if(p.size!=null&&size==null)e.push('size');if(p.entry!=null&&entry==null)e.push('entry');if(p.price!=null&&price==null)e.push('price');if(p.refPrice!=null&&ref==null)e.push('refPrice');
     if(e.length)return errs.push(`positions[${i}]: `+e.join(','));
+    // Zlotr 2026-10-23 21:34: positions carry mcap, h1, h6/change6h, pass{n,wins,losses} for TABLICA
     clean.push({id:'feed-'+id.replace(/[^A-Za-z0-9_-]/g,'_'),feedId:id,feed:true,desk:true,bot,symbol,side,mode,size,sizeUsd:size,entry,ref,pnlBase:entry??ref,price,
       chain:p.chain?String(p.chain).slice(0,20):null,status:p.status?String(p.status).replace(/[<>]/g,'').slice(0,200):'',note:[p.chain,p.status].filter(Boolean).join(' · ').replace(/[<>]/g,'').slice(0,200),
-      tiers:(Number.isInteger(p.tiers)&&p.tiers>=0&&p.tiers<=4)?p.tiers:0,h1:fin(p.h1),openedAt:Date.parse(p.openedAt)||Date.now(),updatedAt:Date.now(),priceSource:'desk'});});
+      tiers:(Number.isInteger(p.tiers)&&p.tiers>=0&&p.tiers<=4)?p.tiers:0,h1:fin(p.h1),h6:fin(p.h6??p.change6h),change6h:fin(p.change6h??p.h6),mcap:fin(p.mcap),pass:(p.pass&&typeof p.pass==='object')?{n:Math.max(0,fin(p.pass.n)|0),wins:Math.max(0,fin(p.pass.wins)|0),losses:Math.max(0,fin(p.pass.losses)|0)}:{n:0,wins:0,losses:0},openedAt:Date.parse(p.openedAt)||Date.now(),updatedAt:Date.now(),priceSource:'desk'});});
   if(errs.length)return {error:errs};
   lastFeedAt=Date.now();const res={opened:[],updated:[],closed:[],activity:0};const ids=new Set(clean.map(p=>p.id));
   for(const p of clean){const old=positions[p.id];positions[p.id]=p;io.emit('position',p);
