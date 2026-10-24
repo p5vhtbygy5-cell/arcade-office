@@ -105,25 +105,30 @@ const TOK_RE=/^((?:Pilnuje|Zamykam|Otwieram|Kupuj[eę]|Trzymam|Sprzedaj[eę](?:\
 const TOK_WORD=/([A-Za-z0-9$._\-]{2,24})/g;
 const TOK_STOP=new Set(['DO','NA','ZA','PO','OD','WE','WE','W','Z','I','A','THE','TO','OF','AND','OR','BY','OK','SITO','TOKENOW','TOKEN','PRZEZ','MIN','MAX','BANKU','TABLICE','PONIZEJ','POWYZEJ','JEDYNY','KANDYDAT','BEZ','WYBORU','SEDZIEGO','PRZESZLO','PRZEZ','FRESH','STAGE','SUPERPOSITION','RECHECK','PONOWNIE','ZA','S','HTTP','USD']);
 const VERB_TOK=/^((?:Przepuszczam|Odrzucilem|Odrzuciłem|Przekazalem|Przekazałem|Biore|Biorę|Ponownie sprawdzilem|Ponownie sprawdziłem|Wystawilem|Wystawiłem|Wypelnione:|Wypełnione:|Pilnuje|Zamykam|Otwieram|Kupuj[eę]|Trzymam|Sprzedaj[eę](?:\s+\d\/\d)?|Sprzedałem(?:\s+\d\/\d)?|Zamknąłem|Otworzyłem|Zamknalem|Polowa|Połowa)\s+)([A-Za-z0-9$._\-]{1,24})/;
+// Zlotr 2026-10-26 00:45: highlight only known tokens (held or named by a bot verb); held default green+underline; spaced names whole
+const KNOWN=new Set();const HELD_ST=v=>({color:v>0?'#3dff7a':v<0?'#ff4d4d':'#3dff7a',textDecoration:'underline'});
+const NAME_RE=/^((?:Wypelnione:|Wypełnione:|SEDZIA wybor:|SEDZIA rynek)\s+)([^:(]{1,24}?)(?=\s*(?:\(|:|$))/;
+function tokEl(tok,open,v){const up=tok.toUpperCase();KNOWN.add(up);return open.has(up)?spEl(tok,null,HELD_ST(v)):spEl(tok,'#ffffff',{textDecoration:'underline'});}
 function openSyms(){const s=new Set();for(const p of Object.values(positions||{})){const sym=String(p.symbol||'').toUpperCase();if(sym)s.add(sym);}return s;}
 function spEl(s,c,extra){const e=document.createElement('span');e.textContent=s;if(c)e.style.color=c;if(extra)Object.assign(e.style,extra);return e;}
 function appendTokBody(el,body,open){
- const pil=/^(Pilnuje\s+)([A-Za-z0-9$._\-]{1,24})(:\s*)(FRESH|STAGE\s*0|Stage\s+(?:IV|III|II|I))?(.*)$/i.exec(body);
+ const pil=/^(Pilnuje\s+)([^:]{1,24}?)(:\s*)(FRESH|STAGE\s*0|Stage\s+(?:IV|III|II|I))?(.*)$/i.exec(body);
  if(pil){el.append(pil[1]);const tok=pil[2],sep=pil[3]||'',lab=pil[4]||'',tail=pil[5]||'';
   const isOpen=open.has(tok.toUpperCase());const rest=sep+lab+tail;const pm=/([+\-−])\s?(\d+(?:[.,]\d+)?)\s?%/.exec(rest);const v=pm?(pm[1]=='+'?1:-1)*parseFloat(pm[2].replace(',','.')):0;
-  if(isOpen)el.append(spEl(tok,v>0?'#3dff7a':v<0?'#ff4d4d':null));else el.append(spEl(tok,'#ffffff',{textDecoration:'underline'}));
+  el.append(tokEl(tok,open,v));
   if(sep)el.append(sep);
   if(/^FRESH$/i.test(lab))el.append(spEl(lab,'#ffffff',{textDecoration:'underline'}));
   else if(lab){const sm=/^(STAGE\s*0)$/i.exec(lab)||/^Stage\s+(IV|III|II|I)$/i.exec(lab);const key=sm?(sm[1]?sm[1].toUpperCase():'STAGE 0'):null;const col=key&&(STAGE_COL[key]||STAGE_COL[key.replace(/^STAGE\s*/i,'')]);el.append(col?spEl(lab,col):lab);}
   if(tail)appendTokTail(el,tail,open);return;}
- const k=VERB_TOK.exec(body)||TOK_RE.exec(body);
+ const k=NAME_RE.exec(body)||VERB_TOK.exec(body)||TOK_RE.exec(body);
  if(k){el.append(k[1]);const tok=k[2],up=tok.toUpperCase();const rest=body.slice(k[0].length);const pm=/([+\-−])\s?(\d+(?:[.,]\d+)?)\s?%/.exec(rest);const v=pm?(pm[1]=='+'?1:-1)*parseFloat(pm[2].replace(',','.')):0;
-  if(open.has(up))el.append(spEl(tok,v>0?'#3dff7a':v<0?'#ff4d4d':null));else el.append(spEl(tok,'#ffffff',{textDecoration:'underline'}));
+  if(/^\d+$/.test(tok)||TOK_STOP.has(up))el.append(tok);else el.append(tokEl(tok,open,v));
   appendTokTail(el,rest,open);return;}
  appendTokTail(el,body,open);}
 function appendTokTail(el,text,open){let last=0,m;TOK_WORD.lastIndex=0;while((m=TOK_WORD.exec(text))){if(m.index>last)el.append(text.slice(last,m.index));const tok=m[1],up=tok.toUpperCase();
   if(/^(STAGE|FRESH|IV|III|II|I)$/i.test(tok)){if(/^FRESH$/i.test(tok))el.append(spEl(tok,'#ffffff',{textDecoration:'underline'}));else if(STAGE_COL[up]||STAGE_COL[tok])el.append(spEl(tok,STAGE_COL[up]||STAGE_COL[tok]));else el.append(tok);}
-  else if(!TOK_STOP.has(up)&&!/^\d/.test(tok)&&!open.has(up)&&/[A-Za-z]/.test(tok))el.append(spEl(tok,'#ffffff',{textDecoration:'underline'}));
+  else if(open.has(up))el.append(spEl(tok,null,HELD_ST(0)));
+  else if(KNOWN.has(up)&&!TOK_STOP.has(up))el.append(spEl(tok,'#ffffff',{textDecoration:'underline'}));
   else el.append(tok);last=m.index+tok.length;}if(last<text.length)el.append(text.slice(last));}
 function sysLine(el,m){const r=/^(\d\d:\d\d )?🤖 ([A-Za-z_]+): ([\s\S]*)$/.exec(m.text||'');if(!r){el.textContent='» '+m.text;return;}
  const bot=String(m.bot||r[2]).toUpperCase(),bc=BOT_COL[bot]||BOT_COL_DEF,body=r[3];el.append('» ',spEl((r[1]||'')+'🤖 '+r[2],bc),': ');
