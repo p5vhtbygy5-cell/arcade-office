@@ -146,7 +146,7 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   // activity -> chat + bubbles (+ errand when the bot is idle); first feed only marks history as seen
   const first=feedSeen.size===0;const fresh=[];
   for(const a of (Array.isArray(acts)?acts.slice(-200):[])){if(!a)continue;const bot=String(a.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))continue;
-    const text=String(a.text||'').replace(/[<>]/g,'').slice(0,160);if(!text)continue;const ts=String(a.ts||'');const k=ts+'|'+bot+'|'+text;if(feedSeen.has(k))continue;feedSeen.add(k);
+    const text=String(a.text||'').replace(/[<>]/g,'').slice(0,240);if(!text)continue;const ts=String(a.ts||'');const k=ts+'|'+bot+'|'+text;if(feedSeen.has(k))continue;feedSeen.add(k);
     const item={ts,bot,text,kind:String(a.kind||'').slice(0,40)};feedActivity.push(item);fresh.push(item);}
   while(feedActivity.length>200)feedActivity.shift();if(feedSeen.size>5000)feedSeen.clear();
   // Zlotr 2026-10-23 21:28: within same-second bot burst: VET summary→pass→reject→handoff; SCAN batch→handoff; RISK Pilnuje IV→…→FRESH
@@ -165,7 +165,7 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   if(b.news&&typeof b.news==='object'&&Array.isArray(b.news.items)){const items=b.news.items.slice(0,20).map(x=>({title:String(x&&x.title||'').replace(/[<>]/g,'').slice(0,140),source:String(x&&x.source||'').replace(/[<>]/g,'').slice(0,40),category:String(x&&x.category||'').slice(0,20),publishedAt:+(x&&x.publishedAt)||null})).filter(x=>x.title);
     if(items.length){feedNews={items,updatedAt:Date.parse(b.news.updatedAt)||Date.now(),error:null,source:'feed:'+String(b.news.source||'desk').slice(0,30)};io.emit('ticker',tickerOut());}}
   if(b.botEvents&&typeof b.botEvents==='object'){const ev={};for(const n of BOT_NAMES){const l=b.botEvents[n];ev[n]=(Array.isArray(l)?l:[]).slice(0,10).map(x=>({ts:String(x&&x.ts||'').slice(0,40),
-     text:String(x&&x.text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'').replace(/[<>]/g,'').replace(/0x[0-9a-fA-F]{6,}|[1-9A-HJ-NP-Za-km-z]{30,}/g,'').trim().slice(0,60)})).filter(x=>x.text);}bots.setEvents(ev);}
+     text:String(x&&x.text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'').replace(/[<>]/g,'').replace(/0x[0-9a-fA-F]{6,}|[1-9A-HJ-NP-Za-km-z]{30,}/g,'').trim().slice(0,200)})).filter(x=>x.text);}bots.setEvents(ev);}
   if(Array.isArray(b.posEvents)){posEvents=cleanPosEvents(b.posEvents);io.emit('posEvents',posEvents);}
   if(b.portfolio!==undefined){const pf=cleanPortfolio(b.portfolio);if(pf){portfolio=pf;io.emit('portfolio',portfolio);}}
   return res;}

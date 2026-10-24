@@ -101,18 +101,18 @@ socket.on('correct',d=>{const p=players[me];if(p){p.x=p.rx=d.x;p.y=p.ry=d.y;}});
 // Zlotr 2026-10-23 21:28: chat — bot colour; FRESH white underline; Stage greens light→dark; unopened tickers white underline
 const BOT_COL={SCAN:'#ffe14d',VET:'#4de1ff',BOOK:'#c58cff',SIZE:'#ff8ad8',FILLS:'#ffb347',FILL:'#ffb347',RISK:'#7fb2ff',CHIEF:'#f5ecc8',SOCIAL:'#b8a890'},BOT_COL_DEF='#b8a890';
 const STAGE_COL={'STAGE 0':'#b8ffb8','0':'#b8ffb8','I':'#7dff7d','II':'#3dff7a','III':'#1fb855','IV':'#0d7a35'};
-const TOK_RE=/^((?:Pilnuje|Zamykam|Otwieram|Kupuj[eę]|Trzymam|Sprzedaj[eę](?:\s+\d\/\d)?|Sprzedałem(?:\s+\d\/\d)?|Zamknąłem|Otworzyłem)\s+)([A-Za-z0-9$._\-]{1,24})/;
-const TOK_WORD=/([A-Za-z0-9$._\-]{2,24})/g;
+const TOK_RE=/^((?:Pilnuje|Zamykam|Otwieram|Kupuj[eę]|Trzymam|Sprzedaj[eę](?:\s+\d\/\d)?|Sprzedałem(?:\s+\d\/\d)?|Zamknąłem|Otworzyłem)\s+)([A-Za-z0-9$._\-]{1,40})/;
+const TOK_WORD=/([A-Za-z0-9$._\-]{2,40})/g;
 const TOK_STOP=new Set(['DO','NA','ZA','PO','OD','WE','WE','W','Z','I','A','THE','TO','OF','AND','OR','BY','OK','SITO','TOKENOW','TOKEN','PRZEZ','MIN','MAX','BANKU','TABLICE','PONIZEJ','POWYZEJ','JEDYNY','KANDYDAT','BEZ','WYBORU','SEDZIEGO','PRZESZLO','PRZEZ','FRESH','STAGE','SUPERPOSITION','RECHECK','PONOWNIE','ZA','S','HTTP','USD']);
-const VERB_TOK=/^((?:Przepuszczam|Odrzucilem|Odrzuciłem|Przekazalem|Przekazałem|Biore|Biorę|Ponownie sprawdzilem|Ponownie sprawdziłem|Wystawilem|Wystawiłem|Wypelnione:|Wypełnione:|Pilnuje|Zamykam|Otwieram|Kupuj[eę]|Trzymam|Sprzedaj[eę](?:\s+\d\/\d)?|Sprzedałem(?:\s+\d\/\d)?|Zamknąłem|Otworzyłem|Zamknalem|Polowa|Połowa)\s+)([A-Za-z0-9$._\-]{1,24})/;
+const VERB_TOK=/^((?:Przepuszczam|Odrzucilem|Odrzuciłem|Przekazalem|Przekazałem|Biore|Biorę|Ponownie sprawdzilem|Ponownie sprawdziłem|Wystawilem|Wystawiłem|Wypelnione:|Wypełnione:|Pilnuje|Zamykam|Otwieram|Kupuj[eę]|Trzymam|Sprzedaj[eę](?:\s+\d\/\d)?|Sprzedałem(?:\s+\d\/\d)?|Zamknąłem|Otworzyłem|Zamknalem|Polowa|Połowa)\s+)([A-Za-z0-9$._\-]{1,40})/;
 // Zlotr 2026-10-26 00:45: highlight only known tokens (held or named by a bot verb); held default green+underline; spaced names whole
 const KNOWN=new Set();const HELD_ST=v=>({color:v>0?'#3dff7a':v<0?'#ff4d4d':'#3dff7a',textDecoration:'underline'});
-const NAME_RE=/^((?:Wypelnione:|Wypełnione:|SEDZIA wybor:|SEDZIA rynek)\s+)([^:(]{1,24}?)(?=\s*(?:\(|:|$))/;
+const NAME_RE=/^((?:Wypelnione:|Wypełnione:|SEDZIA wybor:|SEDZIA rynek|wybor:)\s+)([^:(]{1,40}?)(?=\s*(?:\(|:|$))/;
 function tokEl(tok,open,v){const up=tok.toUpperCase();KNOWN.add(up);return open.has(up)?spEl(tok,null,HELD_ST(v)):spEl(tok,'#ffffff',{textDecoration:'underline'});}
 function openSyms(){const s=new Set();for(const p of Object.values(positions||{})){const sym=String(p.symbol||'').toUpperCase();if(sym)s.add(sym);}return s;}
 function spEl(s,c,extra){const e=document.createElement('span');e.textContent=s;if(c)e.style.color=c;if(extra)Object.assign(e.style,extra);return e;}
 function appendTokBody(el,body,open){
- const pil=/^(Pilnuje\s+)([^:]{1,24}?)(:\s*)(FRESH|STAGE\s*0|Stage\s+(?:IV|III|II|I))?(.*)$/i.exec(body);
+ const pil=/^(Pilnuje\s+)([^:]{1,40}?)(:\s*)(FRESH|STAGE\s*0|Stage\s+(?:IV|III|II|I))?(.*)$/i.exec(body);
  if(pil){el.append(pil[1]);const tok=pil[2],sep=pil[3]||'',lab=pil[4]||'',tail=pil[5]||'';
   const isOpen=open.has(tok.toUpperCase());const rest=sep+lab+tail;const pm=/([+\-−])\s?(\d+(?:[.,]\d+)?)\s?%/.exec(rest);const v=pm?(pm[1]=='+'?1:-1)*parseFloat(pm[2].replace(',','.')):0;
   el.append(tokEl(tok,open,v));
