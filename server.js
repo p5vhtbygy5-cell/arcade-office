@@ -147,7 +147,10 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   const first=feedSeen.size===0;const fresh=[];
   for(const a of (Array.isArray(acts)?acts.slice(-200):[])){if(!a)continue;const bot=String(a.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))continue;
     const text=String(a.text||'').replace(/[<>]/g,'').slice(0,240);if(!text)continue;const ts=String(a.ts||'');const k=ts+'|'+bot+'|'+text;if(feedSeen.has(k))continue;feedSeen.add(k);
-    const item={ts,bot,text,kind:String(a.kind||'').slice(0,40)};feedActivity.push(item);fresh.push(item);}
+    const item={ts,bot,text,kind:String(a.kind||'').slice(0,40)};const prev=feedActivity[feedActivity.length-1];
+    // Zlotr 2026-10-25 01:10: same bot + same text (ignoring HH:MM) as previous line -> refresh time, no new chat line
+    if(prev&&prev.bot===bot&&noTm(prev.text)===noTm(text)){prev.ts=ts;prev.text=text;continue;}
+    feedActivity.push(item);fresh.push(item);}
   while(feedActivity.length>200)feedActivity.shift();if(feedSeen.size>5000)feedSeen.clear();
   // Zlotr 2026-10-23 21:28: within same-second bot burst: VET summary→pass→reject→handoff; SCAN batch→handoff; RISK Pilnuje IV→…→FRESH
   function riskStageRank(text){const t=String(text||'');if(/\bFRESH\b/.test(t))return 5;if(/\bSTAGE\s*0\b/i.test(t)||/:\s*Stage\s*0\b/i.test(t))return 4;const m=/\bStage\s+(IV|III|II|I)\b/i.exec(t);if(m)return({IV:0,III:1,II:2,I:3})[m[1].toUpperCase()];return 6;}
@@ -170,7 +173,9 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   if(b.portfolio!==undefined){const pf=cleanPortfolio(b.portfolio);if(pf){portfolio=pf;io.emit('portfolio',portfolio);}}
   return res;}
 app.post('/api/feed',auth,(q,r)=>{const res=applyFeed(q.body);if(res.error)return r.status(400).json({error:'Błędne dane',details:res.error});r.json({ok:true,...res});});
-app.get('/api/feed',(q,r)=>r.json({lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:feedActivity.slice(-100),posEvents}));
+const noTm=t=>String(t||'').replace(/^\d\d:\d\d /,'');
+const dedupAdj=l=>{const o=[];for(const a of l){const p=o[o.length-1];if(p&&p.bot===a.bot&&noTm(p.text)===noTm(a.text))o[o.length-1]=a;else o.push(a);}return o;};
+app.get('/api/feed',(q,r)=>r.json({lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:dedupAdj(feedActivity).slice(-100),posEvents}));
 app.get('/api/bot-events',(q,r)=>r.json(bots.events()));
 app.get('/api/portfolio',(q,r)=>r.json(portfolio||{empty:true,trades:0,series:[],recent:[],note:'brak historii portfela (feed jeszcze nie przysłał danych)'}));
 app.get('/api/desk',(q,r)=>r.json(desk||{error:'brak board.json'}));
