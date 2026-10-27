@@ -2,7 +2,8 @@
 const {zoneAt,blocked,ZONES}=MAP;
 const ZN=Object.fromEntries(ZONES.map(z=>[z.id,z.name])); ZN.korytarz='Korytarz';
 const COLORS=['#ff2bd6','#00f0ff','#39ff14','#ffe600','#ff6b00','#b026ff','#ffffff','#ff3b3b'];
-const INK='#f4ecd8', DIM='#8d8376', GOOD='#7dffb0', BAD='#ff5d6c', CYAN='#7ee7ff', AMBER='#ffc14d';
+const INK='#f4ecd8', DIM='#8d8376', LAB='#e7eefc', NEUTRAL='#d5deea', GOOD='#7dffb0', BAD='#ff5d6c', CYAN='#7ee7ff', AMBER='#ffc14d';
+const POSITIONS_REFRESH_MS=30000, PORTFOLIO_REFRESH_MS=30000, POS_PAGE_MS=10000, POS_MIN_CELL=34;
 const STAGE_NAME=['0','I','II','III','IV'];
 const STAGE_COL={'STAGE 0':'#b8ffb8','0':'#b8ffb8','I':'#7dff7d','II':'#3dff7a','III':'#1fb855','IV':'#0d7a35'};
 const graphs=FLAP.graphs;
@@ -13,11 +14,13 @@ const office=OFFICE.create($('office'));
 const nameFlap=FLAP.create($('nameFlap'),{rowDelay:0,startDelay:0,maxCell:150,onRow:()=>audio.clack()});
 const priceFlap=FLAP.create($('priceFlap'),{rowDelay:0,startDelay:3000,maxCell:96,onRow:()=>audio.clack()});
 const statFlap=FLAP.create($('statFlap'),{rowDelay:0,startDelay:6000,maxCell:54,onRow:r=>{if(r===0)audio.clack();}});
-const posFlap=FLAP.create($('posFlap'),{rowDelay:3000,startDelay:400,maxCell:72,onRow:()=>audio.clack()});
-const portFlap=FLAP.create($('portFlap'),{rowDelay:3000,startDelay:400,maxCell:64,onRow:()=>audio.clack()});
+const posFlap=FLAP.create($('posFlap'),{rowDelay:3000,startDelay:400,maxCell:78,flipMs:680,onRow:()=>audio.clack()});
+const portFlap=FLAP.create($('portFlap'),{rowDelay:3000,startDelay:400,maxCell:92,flipMs:680,onRow:()=>audio.clack()});
 let me=null, players={}, positions={}, portfolio=null, ticker=null, top10={items:[]}, scan=null;
 let printerPile=0, scope='global', joined=false, myName='', myColor=COLORS[0], mySprite=0;
-let feedAt=0, shownId='', shownData='', posSig='', portSig='', queueSig='';
+let feedAt=0, shownId='', shownData='', queueSig='';
+let posOrder=[], posSnap=null, posCommitAt=0, posPage=0, posPageAt=0, posBoot=true, posVis='';
+let portSnap=null, portCommitAt=0, portBoot=true, portVis='', portDraw=null, tableSig='';
 const bubbles={}, riskBadge={}, fxParts=[];
 let shake={until:0,mag:0,dur:1}, toastUntil=0, lastErr='';
 const fxc=$('fxc'), fxg=fxc.getContext('2d');
@@ -73,6 +76,25 @@ function cell(s,w,c){
   const g=graphs(String(s));
   const cut=g.length>w?g.slice(0,w):g;
   return {t:cut.join('')+' '.repeat(Math.max(0,w-cut.length)), c};
+}
+function cellR(s,w,c){
+  const g=graphs(String(s));
+  const cut=g.length>w?g.slice(g.length-w):g;
+  return {t:' '.repeat(Math.max(0,w-cut.length))+cut.join(''), c};
+}
+function rnd1(v){const n=+v; return Number.isFinite(n)?Math.round(n*10)/10:null;}
+function rnd2(v){const n=+v; return Number.isFinite(n)?Math.round(n*100)/100:null;}
+function fmt1(v){
+  const n=rnd1(v);
+  if(n==null) return '—';
+  const s=n>0?'+':n<0?'−':'';
+  return s+Math.abs(n).toFixed(1)+'%';
+}
+function fmt2(v, sign){
+  const n=rnd2(v);
+  if(n==null) return '—';
+  const s=n<0?'−':(sign&&n>0?'+':'');
+  return s+'$'+Math.abs(n).toFixed(2);
 }
 function tone(v){return v==null||!Number.isFinite(+v)?DIM:+v>0?GOOD:+v<0?BAD:INK;}
 const STG={order:'ORDER',order_blocked:'BLOK',soft_pass:'VET+',soft_reject:'VET-',soft_missing:'VET?',hard_reject:'HARD-',hard_pass:'HARD+',not_enriched:'SUROWE',cheap_reject:'CHP-',cooldown:'COOL',cooldown_skip:'COOL',repeat_skip:'POWT',held_skip:'HELD',filled:'KUPIONY',picked:'WYBOR',dodge_max_pain:'BOL'};
@@ -213,77 +235,145 @@ function syncScan(force){
   shownId=id; shownData=data;
   paintScan(tok, cascade);
 }
-function posLine(p){
-  const pl=pnlOf(p), h6=p.h6!=null?p.h6:p.change6h;
-  const tier=(p.tiers>=1&&p.tiers<=3)?(4-p.tiers)+'/4 ':'';
-  const sym=tier+showName(p);
-  const st=stageOf(p);
-  const parts=[
-    cell(sym,18,INK), cell(p.side==='SHORT'?'▼S':'▲L',4,p.side==='SHORT'?BAD:GOOD),
-    cell(fmtPct(pl),8,tone(Number.isFinite(pl)?pl:null)),
-    cell(fmtPct(p.h1),7,tone(num(p.h1))), cell(fmtPct(h6),7,tone(num(h6))),
-    cell(fmtK(p.mcap),8,INK)
-  ];
-  const pass=p.pass||{}; const n=pass.n|0;
-  if(!n) parts.push(cell('0',10,INK));
-  else {
-    const body=[{t:String(n),c:'#fff'},{t:'(',c:'#fff'},{t:String(pass.wins|0),c:GOOD},{t:',',c:'#fff'},{t:String(pass.losses|0),c:BAD},{t:')',c:'#fff'}];
-    const len=body.reduce((a,x)=>a+graphs(x.t).length,0);
-    if(len<10) body.push({t:' '.repeat(10-len),c:null});
-    parts.push(...body);
-  }
-  parts.push(cell(st==null?'':STAGE_NAME[st]||'',4,st==null?DIM:STAGE_COL[STAGE_NAME[st]]||GOOD));
+const POS_COLS=[['SYMBOL',16],['KIER',4],['PNL%',7],['1H',6],['6H',6],['MCAP',7],['PASS',9],['ST',3]];
+function colGap(){return {t:' ', c:null};}
+function joinCols(cells){
+  const parts=[];
+  cells.forEach((c,i)=>{if(i) parts.push(colGap()); parts.push(c);});
   return spanRow(parts);
 }
+function posWidth(){return POS_COLS.reduce((a,c)=>a+c[1],0)+(POS_COLS.length-1);}
+function centerLine(text, width, color){
+  const g=graphs(text), pad=Math.max(0, width-g.length), left=Math.floor(pad/2);
+  return spanRow([{t:' '.repeat(left)+g.join('')+' '.repeat(pad-left), c:color}]);
+}
+function posHead(){
+  return joinCols(POS_COLS.map(([s,w])=>cell(s,w,NEUTRAL)));
+}
+function fitParts(parts, w){
+  const out=[]; let left=w;
+  for(const p of parts){
+    if(left<=0) break;
+    const g=graphs(p.t);
+    if(g.length<=left){out.push(p); left-=g.length;}
+    else {out.push({t:g.slice(0,left).join(''), c:p.c}); left=0;}
+  }
+  if(left>0) out.push({t:' '.repeat(left), c:null});
+  return out;
+}
+function posLine(p){
+  const tier=(p.tiers>=1&&p.tiers<=3)?(4-p.tiers)+'/4 ':'';
+  const pass=p.pass||{}, n=pass.n|0;
+  const st=p.st, stTxt=st==null?'':(STAGE_NAME[st]||''), stCol=st==null?DIM:(STAGE_COL[STAGE_NAME[st]]||GOOD);
+  const passBody=!n?[{t:'0',c:'#fff'}]:[{t:String(n),c:'#fff'},{t:'(',c:'#fff'},{t:String(pass.wins|0),c:GOOD},{t:',',c:'#fff'},{t:String(pass.losses|0),c:BAD},{t:')',c:'#fff'}];
+  const parts=[
+    cell(tier+(p.name||''),16,INK), colGap(),
+    cell(p.side==='SHORT'?'▼S':'▲L',4,p.side==='SHORT'?BAD:GOOD), colGap(),
+    cellR(fmt1(p.pnl),7,tone(p.pnl)), colGap(),
+    cellR(fmt1(p.h1),6,tone(p.h1)), colGap(),
+    cellR(fmt1(p.h6),6,tone(p.h6)), colGap(),
+    cellR(fmtK(p.mcap),7,INK), colGap()
+  ];
+  parts.push(...fitParts(passBody, 9), colGap(), cellR(stTxt,3,stCol));
+  return spanRow(parts);
+}
+function snapPos(p){
+  return {id:p.id, name:showName(p), side:p.side, tiers:p.tiers|0,
+    pnl:rnd1(pnlOf(p)), h1:rnd1(p.h1), h6:rnd1(p.h6!=null?p.h6:p.change6h), mcap:p.mcap,
+    pass:p.pass?{n:p.pass.n|0,wins:p.pass.wins|0,losses:p.pass.losses|0}:{n:0,wins:0,losses:0},
+    st:stageOf(p), openedAt:p.openedAt||0};
+}
+function posPageSize(){
+  const cv=$('posFlap');
+  const h=cv.clientHeight||cv.height||480;
+  const gap=4;
+  const n=Math.floor((h+gap)/(POS_MIN_CELL+gap));
+  return Math.max(1, n-1);
+}
 function syncPos(force){
-  const list=Object.values(positions).sort((a,b)=>(b.openedAt||0)-(a.openedAt||0));
-  const show=list.slice(0,8);
-  const sig=show.map(p=>[p.id,showName(p),p.price,p.h1,p.h6,p.mcap,p.change5m,p.change24h,p.fdv,p.volume1h,p.holders,p.tiers,p.side,p.peak,stageOf(p)].join(':')).join('|')+'#'+list.length;
-  if(!force&&sig===posSig) return;
-  const prevIds=posSig?posSig.split('|').map(s=>s.split(':')[0]).join(','):null;
-  const cascade=!!force||prevIds!==show.map(p=>p.id).join(',');
-  posSig=sig;
-  const head=spanRow(['SYMBOL','KIER','PNL%','1H','6H','MCAP','PASS','ST'].map((s,i)=>cell(s,[18,4,8,7,7,8,10,4][i],DIM)));
-  const rows=[head];
-  if(!show.length) rows.push(spanRow([{t:'BRAK OTWARTYCH POZYCJI', c:AMBER}]));
-  else show.forEach(p=>rows.push(posLine(p)));
-  posFlap.setRows(rows, cascade?'cascade':'patch');
-  $('posNote').textContent=(list.length>show.length?'+'+(list.length-show.length)+' więcej · ':'')+'PASS = N(wygrane, przegrane) · ST = szczyt PnL';
-  renderTable();
+  const now=Date.now();
+  const all=Object.values(positions);
+  const ids=new Set(all.map(p=>p.id));
+  const structural=!posSnap||posOrder.length!==all.length||posOrder.some(id=>!ids.has(id))||all.some(p=>posOrder.indexOf(p.id)<0);
+  const due=!posCommitAt||now-posCommitAt>=POSITIONS_REFRESH_MS;
+  if(structural||due||force||!posSnap){
+    const ranked=all.map(snapPos).sort((a,b)=>(b.openedAt||0)-(a.openedAt||0)||String(a.id).localeCompare(String(b.id)));
+    posOrder=ranked.map(p=>p.id);
+    posSnap=ranked;
+    posCommitAt=now||1;
+    if(structural){posPage=0; posPageAt=now;}
+  }
+  const per=posPageSize();
+  const pages=Math.max(1, Math.ceil((posSnap.length||1)/per));
+  const count=posSnap.length;
+  if(posPage>=pages) posPage=0;
+  let turned=false;
+  if(count>per&&posPageAt&&now-posPageAt>=POS_PAGE_MS){posPage=(posPage+1)%pages; posPageAt=now; turned=true;}
+  else if(!posPageAt) posPageAt=now;
+  const slice=count?posSnap.slice(posPage*per, posPage*per+per):[];
+  const width=posWidth();
+  const rows=[posHead()];
+  if(!slice.length) rows.push(centerLine('BRAK OTWARTYCH POZYCJI', width, NEUTRAL));
+  else slice.forEach(p=>rows.push(posLine(p)));
+  const sig=rows.map(r=>r.text).join('\n')+'#'+posPage+'/'+pages;
+  const note=(count?count+' pozycji':'brak')+(pages>1?'  '+(posPage+1)+'/'+pages:'')+'  ·  PASS = N(wygrane, przegrane)  ·  ST = szczyt';
+  if($('posNote').textContent!==note) $('posNote').textContent=note;
+  if(!force&&!turned&&sig===posVis) return;
+  const firstData=posBoot&&count>0;
+  posVis=sig;
+  posFlap.setRows(rows, firstData?'cascade':'settle');
+  if(firstData) posBoot=false;
+}
+function pfName(t){return t?(t.displaySymbol||t.token||'—'):'—';}
+function stageBits(stages){
+  if(!Array.isArray(stages)||stages.length<5) return '';
+  const names=['0','I','II','III','IV'];
+  if(!stages.some(n=>n)) return '';
+  return '  '+names.map((n,i)=>n+':'+((stages[i]|0))).join(' ');
+}
+function portRows(pf){
+  if(!pf||!pf.trades){
+    return [centerLine('BRAK HISTORII', 28, NEUTRAL), spanRow([{t:'BANK ',c:LAB},{t:fmt2(pf&&pf.bank,false),c:INK}])];
+  }
+  const all=pf.trades|0, wins=pf.wins|0, losses=pf.losses!=null?pf.losses|0:Math.max(0,all-wins);
+  const rate=pf.winRate==null?'—':(rnd1(pf.winRate).toFixed(0)+'%');
+  const dd=pf.maxDrawdownPct==null?'—':'−'+Math.abs(rnd1(pf.maxDrawdownPct)).toFixed(1)+'%';
+  return [
+    spanRow([{t:'BANK ',c:LAB},{t:fmt2(pf.bank,false),c:INK},{t:'   PNL ',c:LAB},{t:fmt2(pf.realizedPnl,true),c:tone(pf.realizedPnl)}]),
+    spanRow([{t:'ROI ',c:LAB},{t:fmt1(pf.roiPct),c:tone(pf.roiPct)},{t:'   DD ',c:LAB},{t:dd,c:BAD}]),
+    spanRow([{t:'WIN (',c:LAB},{t:String(all),c:INK},{t:' ',c:INK},{t:String(wins),c:GOOD},{t:' ',c:INK},{t:String(losses),c:BAD},{t:') ',c:LAB},{t:rate,c:INK}]),
+    spanRow([{t:'TRADES ',c:LAB},{t:String(all),c:INK},{t:stageBits(pf.closeStages),c:NEUTRAL}]),
+    spanRow([{t:'NAJL ',c:LAB},{t:pf.best?(pfName(pf.best)+' '+fmt2(pf.best.net,true)):'—',c:GOOD}]),
+    spanRow([{t:'NAJG ',c:LAB},{t:pf.worst?(pfName(pf.worst)+' '+fmt2(pf.worst.net,true)):'—',c:BAD}])
+  ];
+}
+function portKey(pf){
+  if(!pf||!pf.trades) return 'empty:'+rnd2(pf&&pf.bank);
+  return [rnd2(pf.bank),rnd2(pf.realizedPnl),rnd1(pf.roiPct),pf.trades|0,pf.wins|0,pf.losses|0,rnd1(pf.winRate),rnd1(pf.maxDrawdownPct),pfName(pf.best),rnd2(pf.best&&pf.best.net),pfName(pf.worst),rnd2(pf.worst&&pf.worst.net),stageBits(pf.closeStages)].join('|');
+}
+function syncPort(force){
+  const now=Date.now();
+  const pf=portfolio;
+  const key=portKey(pf);
+  const struct=[(pf&&pf.trades)|0, pfName(pf&&pf.best), pfName(pf&&pf.worst), (pf&&pf.wins)|0, (pf&&pf.losses)|0].join(':');
+  const structural=!portSnap||portSnap.struct!==struct;
+  const due=!portCommitAt||now-portCommitAt>=PORTFOLIO_REFRESH_MS;
+  if(structural||due||force||!portSnap){
+    portSnap={struct, key, pf};
+    portCommitAt=now||1;
+    portDraw=pf;
+  }
+  const rows=portRows(portSnap.pf);
+  const sig=rows.map(r=>r.text).join('\n');
+  const note=pf&&pf.mode?pf.mode+' · od '+fmt2(pf.start,false):'';
+  if($('portNote').textContent!==note) $('portNote').textContent=note;
+  if(!force&&sig===portVis) return;
+  const first=portBoot&&pf&&pf.trades;
+  portVis=sig;
+  portFlap.setRows(rows, first?'cascade':'settle');
+  if(first) portBoot=false;
 }
 function money(v){return v==null?'—':(v<0?'−':'+')+'$'+Math.abs(v).toFixed(2);}
-function syncPort(force){
-  const pf=portfolio;
-  const sig=pf?JSON.stringify([pf.bank,pf.realizedPnl,pf.roiPct,pf.trades,pf.wins,pf.losses,pf.openFull,pf.openTiers,pf.best&&pf.best.net,pf.worst&&pf.worst.net,pf.series&&pf.series.length]):'empty';
-  if(!force&&sig===portSig) return;
-  const cascade=!!force||portSig==='';
-  portSig=sig;
-  if(!pf||!pf.trades){
-    portFlap.setRows([spanRow([{t:'BRAK HISTORII', c:AMBER}]), spanRow([{t:'BANK '+(pf&&pf.bank!=null?money(pf.bank).replace('+','') : '—'), c:INK}])], cascade?'cascade':'patch');
-  }else{
-    const all=pf.trades|0, wins=pf.wins|0, losses=pf.losses!=null?pf.losses|0:Math.max(0,all-wins);
-    const ot=Array.isArray(pf.openTiers)?pf.openTiers:null;
-    const trades=[{t:'TRADES ',c:DIM}];
-    if(ot){
-      const cols=['#7dff7d','#3dff7a','#1fb855','#0d7a35'];
-      trades.push({t:String(pf.openFull??0),c:INK},{t:' (',c:GOOD});
-      ot.forEach((n,i)=>{if(i) trades.push({t:',',c:GOOD}); trades.push({t:String(n||0),c:cols[i]||INK});});
-      trades.push({t:')',c:GOOD});
-    }else trades.push({t:String(all),c:INK});
-    portFlap.setRows([
-      spanRow([{t:'BANK ',c:DIM},{t:(pf.bank==null?'—':'$'+pf.bank.toFixed(2)),c:INK}]),
-      spanRow([{t:'PNL ',c:DIM},{t:money(pf.realizedPnl),c:tone(pf.realizedPnl)}]),
-      spanRow([{t:'ROI ',c:DIM},{t:pf.roiPct==null?'—':fmtPct(pf.roiPct),c:tone(pf.roiPct)}]),
-      spanRow([{t:'WIN ',c:DIM},{t:'(',c:INK},{t:String(all),c:INK},{t:', ',c:INK},{t:String(wins),c:GOOD},{t:', ',c:INK},{t:String(losses),c:BAD},{t:') ',c:INK},{t:pf.winRate==null?'—':pf.winRate.toFixed(0)+'%',c:INK}]),
-      spanRow(trades),
-      spanRow([{t:'MAX DD ',c:DIM},{t:pf.maxDrawdownPct==null?'—':'−'+Math.abs(pf.maxDrawdownPct).toFixed(1)+'%',c:BAD}]),
-      spanRow([{t:'NAJL ',c:DIM},{t:pf.best?((pf.best.token||'')+' '+money(pf.best.net)):'—',c:GOOD}]),
-      spanRow([{t:'NAJG ',c:DIM},{t:pf.worst?((pf.worst.token||'')+' '+money(pf.worst.net)):'—',c:BAD}])
-    ], cascade?'cascade':'patch');
-  }
-  $('portNote').textContent=pf&&pf.mode?pf.mode+' · od $'+(pf.start||1000):'';
-  drawBank($('portChart'), pf);
-}
 function drawChart(cv, rows, up){
   const w=cv.width, h=cv.height; if(w<10||h<10) return;
   const g=cv.getContext('2d');
@@ -324,19 +414,31 @@ function drawBank(cv, pf){
   const g=cv.getContext('2d'); g.clearRect(0,0,w,h); g.fillStyle='#070b12'; g.fillRect(0,0,w,h);
   const s=pf&&pf.series?pf.series.slice():[];
   if(pf&&pf.bank!=null&&s.length&&Math.abs(s[s.length-1].bank-pf.bank)>0.005) s.push({ts:pf.receivedAt||Date.now(), bank:pf.bank});
-  g.font='600 '+Math.max(16, Math.floor(h*0.08))+'px '+(window.AO_UI||'sans-serif');
-  if(s.length<2){g.fillStyle='#8d8376'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('BRAK KRZYWEJ', w/2, h/2); return;}
+  const fs=Math.max(16, Math.floor(h*0.09));
+  g.font='700 '+fs+'px '+(window.AO_UI||'sans-serif');
+  g.fillStyle=LAB; g.textAlign='left'; g.textBaseline='top';
+  g.fillText('BANK', 12, 8);
+  if(s.length<2){g.fillStyle=NEUTRAL; g.textAlign='center'; g.textBaseline='middle'; g.fillText('BRAK KRZYWEJ', w/2, h/2); return;}
   const vals=s.map(p=>p.bank);
   let lo=Math.min(...vals), hi=Math.max(...vals); const pad=Math.max(1,(hi-lo)*0.15); lo-=pad; hi+=pad;
-  const L=8,R=8,T=16,B=16;
+  const L=78,R=16,T=fs+18,B=28;
   const t0=s[0].ts, t1=Math.max(s[s.length-1].ts, t0+1);
   const X=ts=>L+(ts-t0)/(t1-t0)*(w-L-R);
   const Y=v=>T+(1-(v-lo)/(hi-lo))*(h-T-B);
-  if(pf.start!=null){g.strokeStyle='rgba(255,255,255,.2)'; g.setLineDash([4,4]); g.beginPath(); g.moveTo(L,Y(pf.start)); g.lineTo(w-R,Y(pf.start)); g.stroke(); g.setLineDash([]);}
+  g.font='600 '+Math.max(14, Math.floor(fs*0.72))+'px '+(window.AO_UI||'sans-serif');
+  g.fillStyle=NEUTRAL; g.textAlign='right'; g.textBaseline='middle';
+  g.fillText('$'+Math.round(hi), L-8, Y(hi));
+  g.fillText('$'+Math.round(lo), L-8, Y(lo));
+  if(pf.start!=null){g.strokeStyle='rgba(255,255,255,.28)'; g.setLineDash([5,5]); g.beginPath(); g.moveTo(L,Y(pf.start)); g.lineTo(w-R,Y(pf.start)); g.stroke(); g.setLineDash([]);
+    g.textAlign='left'; g.fillText('start', L+4, Math.min(h-B-8, Math.max(T+8, Y(pf.start)-10)));}
   const up=(s[s.length-1].bank>=(pf.start||s[0].bank));
   g.beginPath(); s.forEach((p,i)=>{const x=X(p.ts),y=Y(p.bank); i?g.lineTo(x,y):g.moveTo(x,y);});
   g.strokeStyle=up?GOOD:BAD; g.lineWidth=3; g.stroke();
   g.fillStyle=up?GOOD:BAD; g.beginPath(); g.arc(X(s[s.length-1].ts), Y(s[s.length-1].bank), 4, 0, 7); g.fill();
+  const fmtD=ts=>{try{return new Date(ts).toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'});}catch(e){return '';}};
+  g.fillStyle=NEUTRAL; g.textAlign='left'; g.textBaseline='bottom';
+  g.fillText(fmtD(t0), L, h-6);
+  g.textAlign='right'; g.fillText(fmtD(t1), w-R, h-6);
 }
 function centerOf(el){
   const r=el.getBoundingClientRect(), s=stage.getBoundingClientRect(), sc=s.width/3840||1;
@@ -391,7 +493,6 @@ function onFx(ev){
     burst(posC[0], posC[1], CYAN, 16, 260, 0.8, 180);
   }else if(ev.kind==='risk'){
     if(ev.token) for(const k of nameKeys(ev.token)) if(k&&(riskBadge[k]==null||ev.stage>riskBadge[k])) riskBadge[k]=ev.stage;
-    posSig='';
   }
   if(!audio.isMuted()) audioBtn.classList.add('hit');
   setTimeout(()=>audioBtn.classList.remove('hit'), 360);
@@ -659,10 +760,16 @@ socket.on('playerLeft', id=>{delete players[id]; delete bubbles[id]; updOnline()
 socket.on('correct', d=>{const p=players[me]; if(p){p.x=p.rx=d.x; p.y=p.ry=d.y;}});
 socket.on('chat', m=>{if(!histLoaded&&m.system) chatQueue.push(m); else pushChat(m);});
 socket.on('bubble', d=>{const p=players[d.id]; speak(d.id, d.text);});
-socket.on('positions', list=>{positions={}; for(const p of list||[]) positions[p.id]=p; notePeaks(); feedAt=Date.now(); posSig='';});
-socket.on('position', p=>{positions[p.id]=p; notePeaks(); feedAt=Date.now(); posSig='';});
-socket.on('positionClosed', id=>{delete positions[id]; posSig='';});
-socket.on('portfolio', d=>{if(d&&typeof d==='object'&&!d.empty){portfolio=d; portSig=''; feedAt=Date.now();}});
+function takePositions(list){
+  if(!Array.isArray(list)) return;
+  positions={};
+  for(const p of list) if(p&&p.id) positions[p.id]=p;
+  notePeaks(); feedAt=Date.now(); tableSig=''; renderTable();
+}
+socket.on('positions', takePositions);
+socket.on('position', p=>{if(!p||!p.id) return; positions[p.id]=p; notePeaks(); feedAt=Date.now(); tableSig=''; renderTable();});
+socket.on('positionClosed', id=>{delete positions[id]; tableSig=''; renderTable();});
+socket.on('portfolio', d=>{if(d&&typeof d==='object'&&!d.empty){portfolio=d; feedAt=Date.now();}});
 socket.on('ticker', d=>{if(d&&typeof d==='object') ticker=d;});
 socket.on('top10', d=>{if(d&&Array.isArray(d.items)){top10=d; renderTop10();}});
 socket.on('scan', d=>{if(d&&typeof d==='object'){scan=d; if(d.lastFeedAt) feedAt=d.lastFeedAt; queueSig='';}});
@@ -765,6 +872,7 @@ async function loadHistory(){
     ]);
     if(feed&&feed.activity) feed.activity.forEach(a=>pushChat(formatAct(a)));
     if(feed&&feed.posEvents) renderPosEvents(feed.posEvents);
+    if(!Object.keys(positions).length&&feed&&Array.isArray(feed.positions)&&feed.positions.length) takePositions(feed.positions);
     if(feed&&feed.lastFeedAt) feedAt=feed.lastFeedAt;
     if(port&&!port.empty) portfolio=port;
     if(tick) ticker=tick;
@@ -790,7 +898,7 @@ function frame(t){
   syncScan(false); syncPos(false); syncPort(false);
   const tokNow=currentToken();
   drawChart($('chart'), tokNow&&tokNow.chart, !tokNow||(tokNow.change1h||0)>=0);
-  drawBank($('portChart'), portfolio);
+  drawBank($('portChart'), portDraw||portfolio);
   nameFlap.frame(t); priceFlap.frame(t); statFlap.frame(t); posFlap.frame(t); portFlap.frame(t);
   office.frame(t, {players, me, printerPile, bubbles, hud:hud()});
   drawFx(t); paintChrome(t);
@@ -810,9 +918,30 @@ function loop(t){
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+async function pullPositions(){
+  try{
+    const list=await fetch('/api/positions').then(r=>r.json());
+    if(!Array.isArray(list)||!list.length||Object.keys(positions).length) return;
+    takePositions(list);
+  }catch(e){}
+}
+setTimeout(pullPositions, 1500);
 window.AO={
   demoFx(ev){onFx(Object.assign({ts:Date.now()}, ev||{}));},
-  replay(){shownId=''; shownData=''; posSig=''; portSig=''; syncScan(true); syncPos(true); syncPort(true);},
+  replay(){shownId=''; shownData=''; posBoot=true; portBoot=true; posVis=''; portVis=''; posSnap=null; portSnap=null; syncScan(true); syncPos(true); syncPort(true);},
   unlock(){audio.setMuted(false); return audio.unlock().then(paintAudio);},
-  scan(){return scan;}, positions(){return positions;}, portfolio(){return portfolio;}
+  scan(){return scan;}, positions(){return positions;}, portfolio(){return portfolio;},
+  refreshMs:{positions:POSITIONS_REFRESH_MS, portfolio:PORTFOLIO_REFRESH_MS, page:POS_PAGE_MS},
+  expireBoards(){posCommitAt=1; portCommitAt=1;},
+  skipIntro(){posBoot=false; portBoot=false;},
+  resetFlips(){posFlap.resetStats(); portFlap.resetStats();},
+  board(){
+    syncPos(false); syncPort(false);
+    const pm=posFlap.metrics(), rm=portFlap.metrics();
+    const per=posPageSize(), pages=Math.max(1, Math.ceil((posSnap?posSnap.length:0)/per));
+    return {
+      pos:{total:posSnap?posSnap.length:0, page:posPage+1, pages, per, cellW:pm.cellW, cellH:pm.cellH, cols:pm.cols, rows:pm.rows, gridW:pm.gridW, flips:pm.flips, lines:pm.lines, canvasW:$('posFlap').width},
+      port:{cellW:rm.cellW, cellH:rm.cellH, rows:rm.rows, cols:rm.cols, gridW:rm.gridW, gridH:rm.gridH, flips:rm.flips, lines:rm.lines, canvasW:$('portFlap').width, canvasH:$('portFlap').height}
+    };
+  }
 };

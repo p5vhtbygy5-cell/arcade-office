@@ -3,7 +3,7 @@ Wirtualne biuro i tablice desku (Node.js + Express + Socket.IO, bez kroku budowa
 
 ## Tablice
 - **Skaner** – jeden token naraz (nie lista). Odrzuty pierwszego sita (`cheap_reject` / `CHP-`) nie wchodzą. Rotacja co 10 s po aktualnej paczce; nowy skan zaczyna od początku. Obok płytki: wykres 1h. Wskaźniki z feedu, a gdy da się je dociągnąć: zmiana 5m/1h/6h/24h, płynność, wolumen, mcap/FDV, kupno/sprzedaż, wiek pary, holderzy.
-- **Pozycje** i **portfel** – split-flap. Przy nowej treści wszystkie płytki migoczą, potem wiersze siadają od góry co ok. 3 s. Skaner siada trzema pasami (nazwa, cena, wskaźniki), żeby zdążyć przed kolejnym tokenem.
+- **Pozycje** i **portfel** – split-flap. Pierwsze wejście danych siada wierszami od góry co ok. 3 s. Potem rusza się tylko płytka, której tekst się zmienił (jeden obrót ~0,7 s), a liczby wchodzą na tablicę najwyżej co 30 s. Otwarcie albo zamknięcie pozycji wchodzi od razu. Pozycje nie są obcinane do 8: tablica zmniejsza wiersz, a gdy zejdzie poniżej czytelnego minimum, dzieli listę na strony `n/m` co 10 s. Skaner dalej siada trzema pasami przy każdej zmianie tokenu.
 - Wejście głębiej w pipeline (SCAN → VET → BOOK → kupno FILLS) daje mocniejszy efekt i dźwięk; kupno jest najgłośniejsze. Zamknięcie na minus ma osobny dźwięk, a zysk – dźwięk etapu RISK od szczytu PnL: (0,10]=0, (10,25]=I, (25,50]=II, (50,100]=III, >100=IV. Dźwięk jest z WebAudio (bez plików). Autoplay jest zablokowany do kliknięcia **WŁĄCZ DŹWIĘK**, jest też wyciszenie.
 - Czat publiczny: linia CHIEF/sędziego to samo `wybor: TOKEN`, bez confidence / worth / score.
 
