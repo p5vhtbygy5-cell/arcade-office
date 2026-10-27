@@ -91,6 +91,70 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  fr=await fp({positions:[{id:'U-1',bot:'RISK',symbol:'Łódź',chain:'solana',side:'LONG',size:10,entry:1,price:1.1,mode:'SHADOW'}],activity:[]});
  fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
  chk(fl.some(p=>p.symbol==='Łódź'),'Symbol z polskimi znakami zostaje na tablicy');
- fc.disconnect();}finally{srv.kill();}
+ const row=(id,extra)=>({bot:'RISK',side:'LONG',mode:'SHADOW',size:10,entry:1,price:1,...extra,id});
+ const sample={positions:[
+   row('inu-1',{symbol:'INUWEEN',displaySymbol:'Inuween',address:'MintInu+xx/yy',peakPct:-4.5,price:0.9,chain:'solana'}),
+   row('wif-1',{symbol:'WIF',displaySymbol:'███WIF',address:'AbC123!!!',peakPct:12,price:1.1,chain:'solana'}),
+   row('emo-1',{symbol:'MOON',displaySymbol:'🚀MOON',bot:'FILLS',price:2,entry:2,size:5}),
+   row('drop-1',{symbol:'<>\u0000\u202e',displaySymbol:''}),
+   row('fix-1',{symbol:'',displaySymbol:'Żółć',bot:'VET',size:3}),
+   row('old-1',{symbol:'OLDFEED',bot:'BOOK',price:1.2,size:4}),
+   row('mem-1',{symbol:'MEM',displaySymbol:'Pamięć',peakPct:120,price:1,size:8})
+ ],activity:[{ts:'2026-10-27T18:44:00+02:00',bot:'VET',text:'Widzę Inuween oraz ███WIF \u0001🚀 żółć \u202e',kind:'note'}],
+  botEvents:{RISK:[{ts:'2026-10-27T18:44:00+02:00',text:'Pilnuje ███WIF i Inuween 🚀'}]}};
+ fr=await fp(sample);chk(fr.s==200&&fr.j.opened.length>=6,'Feed z nowymi polami (unicode, ujemny szczyt) przechodzi');
+ fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
+ const by=id=>fl.find(p=>p.feedId===id);
+ const inu=by('inu-1'),wif=by('wif-1'),emo=by('emo-1'),fix=by('fix-1'),old=by('old-1'),mem=by('mem-1');
+ chk(inu&&inu.symbol==='INUWEEN'&&inu.displaySymbol==='Inuween'&&inu.address==='MintInuxxyy'&&inu.peak===-4.5,'Inuween: displaySymbol, oczyszczony mint, ujemny peakPct nie jest zerem');
+ chk(wif&&wif.displaySymbol==='███WIF'&&wif.symbol==='WIF'&&wif.address==='AbC123'&&wif.peak===12,'███WIF: nazwa Unicode i adres bez znaków spoza alfabetu');
+ chk(emo&&emo.displaySymbol==='🚀MOON'&&emo.address==null,'Nazwa z emoji zostaje, brak adresu zostaje null');
+ chk(!by('drop-1'),'Pusty symbol po filtrze pomija wiersz i nie odrzuca feedu');
+ chk(fix&&fix.symbol==='Żółć'&&fix.displaySymbol==='Żółć','Pusty symbol jest naprawiany z displaySymbol');
+ chk(old&&old.displaySymbol==null&&old.address==null&&old.peakPct==null&&old.symbol==='OLDFEED','Stary wiersz bez nowych pól dalej działa');
+ chk(mem&&mem.peak===120,'Szczyt 120 z feedu siedzi w pamięci');
+ fr=await fp({positions:[row('bad',{bot:'NOPE',symbol:''}),row('keep',{symbol:'KEEP'})]});
+ chk(fr.s==400&&!((await fetch('http://localhost:3999/api/positions').then(r=>r.json())).some(p=>p.feedId==='keep')),'Pusty symbol i zły bot nadal dają 400, stan się nie zmienia');
+ const nFx=fev.length;
+ fr=await fp({positions:[row('inu-1',{symbol:'INUWEEN',displaySymbol:'Inuween',address:'MintInu+xx/yy',peakPct:-4.5,price:0.9}),row('wif-1',{symbol:'WIF',displaySymbol:'███WIF',address:'AbC123',peakPct:10,price:1.1}),row('emo-1',{symbol:'MOON',displaySymbol:'🚀MOON',bot:'FILLS',entry:2,price:2,size:5}),row('fix-1',{symbol:'',displaySymbol:'Żółć',bot:'VET',size:3}),row('old-1',{symbol:'OLDFEED',bot:'BOOK',price:1.2,size:4})],
+  closeReasons:{'mem-1':{address:null,peak:69.38,pct:15,net:3,reason:'trail'}},
+  posEvents:[
+   {ts:'2026-10-27T18:50:00Z',action:'CLOSE',token:'PEAKY',displaySymbol:'Szczyt',address:'Mint+Peak/99',peak:69.38,pct:40,net:12.5,usd:100,price:1.4,chain:'solana',reason:'risk'},
+   {ts:'2026-10-27T18:50:01Z',action:'SELL',token:'WIF',displaySymbol:'███WIF',address:'AbC123!!!',peak:12,pct:4,net:1,frac:'1/4',usd:50,price:1.1,chain:'solana'},
+   {ts:'2026-10-27T18:50:02Z',action:'CLOSE',token:'LOSSY',displaySymbol:'Strata',peak:69.38,pct:-8,net:-2,usd:40,price:0.9,chain:'solana'}
+  ]});
+ chk(fr.s==200&&fr.j.closed.includes('feed-mem-1'),'Zamknięcie MEM z closeReasons.peak');
+ await wait(400);
+ const fx=fev.slice(nFx).filter(([e])=>e==='deskFx').map(([,d])=>d);
+ const closeOf=t=>fx.find(e=>e.kind==='close'&&e.token===t);
+ chk(closeOf('Szczyt')&&closeOf('Szczyt').stage===3&&closeOf('Szczyt').peak===69.38,'CLOSE posEvent peak 69.38 to etap III');
+ chk(closeOf('Strata')&&closeOf('Strata').stage===-1&&closeOf('Strata').peak===69.38,'Strata (pct<0) zostaje dźwiękiem straty, szczyt 69.38 zostaje');
+ chk(closeOf('Pamięć')&&closeOf('Pamięć').stage===4&&closeOf('Pamięć').peak===120,'Wyższy szczyt z pamięci wygrywa z peak 69.38 z closeReasons');
+ fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
+ chk(fl.find(p=>p.feedId==='wif-1').peak===12,'Niższy kolejny peakPct nie ścina zapamiętanego szczytu');
+ const gf2=await fetch(F).then(r=>r.json());
+ const evC=gf2.posEvents.find(e=>e.action==='CLOSE'&&e.token==='PEAKY');
+ const evS=gf2.posEvents.find(e=>e.action==='SELL'&&e.displaySymbol==='███WIF');
+ chk(evC&&evC.peak===69.38&&evC.address==='MintPeak99'&&evC.displaySymbol==='Szczyt','posEvents CLOSE niesie address i peak');
+ chk(evS&&evS.peak===12&&evS.address==='AbC123','posEvents SELL niesie address i peak');
+ chk(gf2.activity.some(a=>a.text.includes('Inuween')&&a.text.includes('███WIF')&&a.text.includes('🚀')&&a.text.includes('żółć')&&!a.text.includes('\u0001')&&!a.text.includes('\u202e')),'Aktywność trzyma Unicode, bez sterujących i bidi');
+ const bev=await fetch('http://localhost:3999/api/bot-events').then(r=>r.json());
+ chk(bev.RISK&&bev.RISK.some(x=>x.text.includes('███WIF')&&x.text.includes('🚀')&&x.text.includes('Inuween')),'botEvents trzymają Unicode');
+ fc.disconnect();
+ const createScan=require('./scan.js');
+ const origFetch=global.fetch; let calls=[];
+ global.fetch=async url=>{calls.push(String(url)); const u=String(url);
+  const json=async()=>u.includes('dexscreener')?[{baseToken:{address:'MintLook123',name:'Look'},priceUsd:'1.25',priceChange:{m5:1.5,h1:2,h6:3,h24:4},volume:{h1:900},fdv:1000,marketCap:800,liquidity:{usd:50},txns:{h1:{buys:7,sells:2}},pairCreatedAt:1700000000000,pairAddress:'PAIRLOOK',info:{imageUrl:'https://img.example/a.png'}}]
+   :u.includes('ohlcv')?{data:{attributes:{ohlcv_list:[[1700000000,1,1,1,1.2,3]]}}}:{data:{attributes:{holders:{count:42,distribution_percentage:{top_10:'11'}}}}};
+  return {ok:true,status:200,json};};
+ try{const scn=createScan({io:{emit(){}},extra:()=>({}),onEnrich(){}});
+  scn.watch([{address:'MintLook123',symbol:'LOOK',displaySymbol:'Look★',chain:'solana'}]);
+  chk(scn.snapshot().total===0,'Adres pozycji nie wchodzi do rotacji skanu');
+  await scn.tick(); await scn.tick(); await scn.tick();
+  const v=scn.lookup('MintLook123');
+  chk(!!(v&&v.change5m===1.5&&v.change6h===3&&v.change24h===4&&v.volume1h===900&&v.fdv===1000&&v.buys1h===7&&v.sells1h===2&&v.pairCreatedAt===1700000000000&&v.holders===42&&v.chart&&v.chart.length===1),'DexScreener i GeckoTerminal biorą mint pozycji');
+  chk(calls.some(u=>u.includes('dexscreener.com')&&u.includes('MintLook123'))&&calls.some(u=>u.includes('geckoterminal.com')&&u.includes('MintLook123')),'Zapytania idą na adres z watch()');
+ }catch(e){chk(false,'Lookup mintu: '+e.message);}finally{global.fetch=origFetch;}
+}finally{srv.kill();}
 chk(require('./public/map.js').zoneAt(4*16,2*16+8)=='top10','Strefa Top 10 Krypto przy tablicy');
 b.disconnect();await wait(200);chk(got.a.some(([e])=>e=='playerLeft'),'A widzi wyjście B');a.disconnect();process.exit(ok?0:1);})();

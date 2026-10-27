@@ -95,7 +95,41 @@ function auraOf(stage){
   if(s==='soft_pass'||s==='hard_pass') return 2;
   return 1;
 }
-function heldSet(){const s=new Set(); for(const p of Object.values(positions)) if(p.symbol) s.add(String(p.symbol).toUpperCase()); return s;}
+function showName(p){return (p&&(p.displaySymbol||p.symbol))||'';}
+function nameKeys(s){
+  const u=String(s||'').trim().toUpperCase();
+  if(!u) return [];
+  const core=u.replace(/^[\p{S}\p{P}\p{Z}]+/gu,'').replace(/[\p{S}\p{P}]+$/gu,'');
+  return core&&core!==u?[u,core]:[u];
+}
+function heldSet(){
+  const s=new Set();
+  for(const p of Object.values(positions)) for(const n of [p.symbol, p.displaySymbol]) for(const k of nameKeys(n)) s.add(k);
+  return s;
+}
+function heldHit(open, tok){return nameKeys(tok).some(k=>open.has(k));}
+function stageOf(p){
+  let st=null;
+  for(const k of [].concat(nameKeys(p&&p.symbol), nameKeys(p&&p.displaySymbol))) if(k&&riskBadge[k]!=null&&(st==null||riskBadge[k]>st)) st=riskBadge[k];
+  if(p&&p.peak>0){const from=p.peak<=10?0:p.peak<=25?1:p.peak<=50?2:p.peak<=100?3:4; if(st==null||from>st) st=from;}
+  return st;
+}
+function heldDisplay(tok){
+  if(!tok) return '';
+  const keys=nameKeys(tok.symbol).concat(nameKeys(tok.displaySymbol));
+  for(const p of Object.values(positions)){
+    if(tok.address&&p.address&&tok.address===p.address) return showName(p)||tok.displaySymbol||tok.symbol||'';
+    const pk=nameKeys(p.symbol).concat(nameKeys(p.displaySymbol));
+    if(keys.some(k=>k&&pk.includes(k))) return showName(p)||tok.displaySymbol||tok.symbol||'';
+  }
+  return tok.displaySymbol||tok.symbol||'';
+}
+function tokenHeld(t){
+  if(!t) return false;
+  if(heldHit(heldSet(), t.symbol)||heldHit(heldSet(), t.displaySymbol)) return true;
+  if(t.address) for(const p of Object.values(positions)) if(p.address&&p.address===t.address) return true;
+  return false;
+}
 function rotNow(){
   if(!scan||!scan.total) return {i:0,p:0,left:0};
   const skew=(scan.serverNow||Date.now())-Date.now();
@@ -132,9 +166,10 @@ function paintScan(tok, cascade){
     drawChart($('chart'), null, true);
     return;
   }
+  const label=heldDisplay(tok)||tok.symbol||'';
   const dup=scan.tokens.filter(t=>t.symbol===tok.symbol).length>1;
   const suffix=dup&&tok.address?(' ·'+String(tok.address).slice(-4)):'';
-  nameFlap.setRows([spanRow([{t:tok.symbol+(suffix?suffix:''), c:INK}])], mode);
+  nameFlap.setRows([spanRow([{t:label+(suffix?suffix:''), c:INK}])], mode);
   const ch=tok.change1h;
   priceFlap.setRows([spanRow([{t:fmtPx(tok.price)+'   ', c:INK},{t:fmtPct(ch), c:tone(ch)}])], mode);
   const pct=(lab,v)=>[{t:lab+' ', c:DIM},{t:fmtPct(v)+'   ', c:tone(v)}];
@@ -152,7 +187,7 @@ function paintScan(tok, cascade){
   const q=$('queue');
   if(sig!==queueSig){
     queueSig=sig; q.innerHTML='';
-    (scan.tokens||[]).forEach(t=>{const b=document.createElement('b'); b.textContent=t.symbol; b.dataset.k=(t.address||t.symbol); if(held.has(String(t.symbol).toUpperCase())) b.classList.add('held'); q.appendChild(b);});
+    (scan.tokens||[]).forEach(t=>{const b=document.createElement('b'); b.textContent=heldDisplay(t)||t.symbol; b.dataset.k=(t.address||t.symbol); if(tokenHeld(t)) b.classList.add('held'); q.appendChild(b);});
   }
   const idx=rotNow().i;
   [...q.children].forEach((b,i)=>b.classList.toggle('now', i===idx));
@@ -169,7 +204,7 @@ function paintScan(tok, cascade){
 function syncScan(force){
   const tok=currentToken();
   const id=tok?(scan&&scan.cycleMs)+'#'+rotNow().i+'#'+(tok.address||tok.symbol):'empty';
-  const data=tok?JSON.stringify([tok.price,tok.change5m,tok.change1h,tok.change6h,tok.change24h,tok.liquidity,tok.volume1h,tok.marketCap,tok.fdv,tok.holders,tok.buys1h,tok.sells1h,tok.stage,tok.chart&&tok.chart.length,tok.image,tok.reason]):'';
+  const data=tok?JSON.stringify([tok.price,tok.change5m,tok.change1h,tok.change6h,tok.change24h,tok.liquidity,tok.volume1h,tok.marketCap,tok.fdv,tok.holders,tok.buys1h,tok.sells1h,tok.stage,tok.chart&&tok.chart.length,tok.image,tok.reason,heldDisplay(tok),tokenHeld(tok)]):'';
   if(!force&&id===shownId&&data===shownData){
     const q=$('queue'); if(q.children.length){const i=rotNow().i; [...q.children].forEach((b,n)=>b.classList.toggle('now', n===i));}
     return;
@@ -181,10 +216,10 @@ function syncScan(force){
 function posLine(p){
   const pl=pnlOf(p), h6=p.h6!=null?p.h6:p.change6h;
   const tier=(p.tiers>=1&&p.tiers<=3)?(4-p.tiers)+'/4 ':'';
-  const sym=tier+p.symbol;
-  const st=riskBadge[String(p.symbol||'').toUpperCase()];
+  const sym=tier+showName(p);
+  const st=stageOf(p);
   const parts=[
-    cell(sym,12,INK), cell(p.side==='SHORT'?'▼S':'▲L',4,p.side==='SHORT'?BAD:GOOD),
+    cell(sym,18,INK), cell(p.side==='SHORT'?'▼S':'▲L',4,p.side==='SHORT'?BAD:GOOD),
     cell(fmtPct(pl),8,tone(Number.isFinite(pl)?pl:null)),
     cell(fmtPct(p.h1),7,tone(num(p.h1))), cell(fmtPct(h6),7,tone(num(h6))),
     cell(fmtK(p.mcap),8,INK)
@@ -203,12 +238,12 @@ function posLine(p){
 function syncPos(force){
   const list=Object.values(positions).sort((a,b)=>(b.openedAt||0)-(a.openedAt||0));
   const show=list.slice(0,8);
-  const sig=show.map(p=>[p.id,p.symbol,p.price,p.h1,p.h6,p.mcap,p.tiers,p.side,riskBadge[String(p.symbol||'').toUpperCase()]].join(':')).join('|')+'#'+list.length;
+  const sig=show.map(p=>[p.id,showName(p),p.price,p.h1,p.h6,p.mcap,p.change5m,p.change24h,p.fdv,p.volume1h,p.holders,p.tiers,p.side,p.peak,stageOf(p)].join(':')).join('|')+'#'+list.length;
   if(!force&&sig===posSig) return;
   const prevIds=posSig?posSig.split('|').map(s=>s.split(':')[0]).join(','):null;
   const cascade=!!force||prevIds!==show.map(p=>p.id).join(',');
   posSig=sig;
-  const head=spanRow(['SYMBOL','KIER','PNL%','1H','6H','MCAP','PASS','ST'].map((s,i)=>cell(s,[12,4,8,7,7,8,10,4][i],DIM)));
+  const head=spanRow(['SYMBOL','KIER','PNL%','1H','6H','MCAP','PASS','ST'].map((s,i)=>cell(s,[18,4,8,7,7,8,10,4][i],DIM)));
   const rows=[head];
   if(!show.length) rows.push(spanRow([{t:'BRAK OTWARTYCH POZYCJI', c:AMBER}]));
   else show.forEach(p=>rows.push(posLine(p)));
@@ -355,7 +390,7 @@ function onFx(ev){
     showToast('SPRZEDAŻ '+(ev.frac||'')+'  ·  '+(ev.token||''), CYAN, 1800);
     burst(posC[0], posC[1], CYAN, 16, 260, 0.8, 180);
   }else if(ev.kind==='risk'){
-    if(ev.token) riskBadge[String(ev.token).toUpperCase()]=ev.stage;
+    if(ev.token) for(const k of nameKeys(ev.token)) if(k&&(riskBadge[k]==null||ev.stage>riskBadge[k])) riskBadge[k]=ev.stage;
     posSig='';
   }
   if(!audio.isMuted()) audioBtn.classList.add('hit');
@@ -406,7 +441,7 @@ const VERB_TOK=new RegExp('^((?:Przepuszczam|Odrzucilem|Odrzuciłem|Przekazalem|
 const KNOWN=new Set();
 const HELD_ST=v=>({color:v>0?'#3dff7a':v<0?'#ff4d4d':'#3dff7a',textDecoration:'underline'});
 const NAME_RE=/^((?:Wypelnione:|Wypełnione:|SEDZIA wybor:|SEDZIA rynek|wybor:)\s+)([^:(]{1,40}?)(?=\s*(?:\(|:|$))/;
-function tokEl(tok,open,v){const up=tok.toUpperCase();KNOWN.add(up);return open.has(up)?spEl(tok,null,HELD_ST(v)):spEl(tok,'#ffffff',{textDecoration:'underline'});}
+function tokEl(tok,open,v){for(const k of nameKeys(tok)) KNOWN.add(k);return heldHit(open,tok)?spEl(tok,null,HELD_ST(v)):spEl(tok,'#ffffff',{textDecoration:'underline'});}
 function openSyms(){return heldSet();}
 function spEl(s,c,extra){const e=document.createElement('span');e.textContent=s;if(c)e.style.color=c;if(extra)Object.assign(e.style,extra);return e;}
 function appendTokBody(el,body,open){
@@ -432,8 +467,8 @@ function appendTokTail(el,text,open){
       if(/^FRESH$/i.test(tok)) el.append(spEl(tok,'#ffffff',{textDecoration:'underline'}));
       else if(STAGE_COL[up]||STAGE_COL[tok]) el.append(spEl(tok,STAGE_COL[up]||STAGE_COL[tok]));
       else el.append(tok);
-    }else if(open.has(up)) el.append(spEl(tok,null,HELD_ST(0)));
-    else if(KNOWN.has(up)&&!TOK_STOP.has(up)) el.append(spEl(tok,'#ffffff',{textDecoration:'underline'}));
+    }else if(heldHit(open, tok)) el.append(spEl(tok,null,HELD_ST(0)));
+    else if(nameKeys(tok).some(k=>KNOWN.has(k))&&!TOK_STOP.has(up)) el.append(spEl(tok,'#ffffff',{textDecoration:'underline'}));
     else el.append(tok);
     last=m.index+tok.length;
   }
@@ -480,8 +515,9 @@ function renderPosEvents(evs){
     const d=document.createElement('div');
     const tm=new Date(e.ts).toLocaleTimeString('pl-PL',{timeZone:'Europe/Warsaw',hour:'2-digit',minute:'2-digit'});
     const sg=v=>(v>=0?'+':'')+v; let t;
-    if(e.action==='OPEN'){t=tm+' OPEN '+e.token+' '+(e.chain||'?')+' '+evU(e.usd)+' @'+evP(e.price); d.className='ev-o';}
-    else{t=(tm+' '+(e.action==='SELL'?'SELL '+(e.frac||'1/4'):'CLOSE')+' '+e.token+' '+(e.chain||'?')+' '+evU(e.usd)+' @'+evP(e.price)+' '+(e.reason||'')+' '+(e.pct!=null?sg((+e.pct).toFixed(1))+'%':'')+' '+(e.net!=null?(e.net>=0?'+$':'-$')+Math.abs(e.net).toFixed(2):'')).replace(/\s+/g,' ').trim(); d.className=e.net==null?'ev-o':e.net>=0?'ev-p':'ev-l';}
+    const nm=e.displaySymbol||e.token;
+    if(e.action==='OPEN'){t=tm+' OPEN '+nm+' '+(e.chain||'?')+' '+evU(e.usd)+' @'+evP(e.price); d.className='ev-o';}
+    else{t=(tm+' '+(e.action==='SELL'?'SELL '+(e.frac||'1/4'):'CLOSE')+' '+nm+' '+(e.chain||'?')+' '+evU(e.usd)+' @'+evP(e.price)+' '+(e.reason||'')+' '+(e.pct!=null?sg((+e.pct).toFixed(1))+'%':'')+' '+(e.net!=null?(e.net>=0?'+$':'-$')+Math.abs(e.net).toFixed(2):'')).replace(/\s+/g,' ').trim(); d.className=e.net==null?'ev-o':e.net>=0?'ev-p':'ev-l';}
     d.textContent=t; el.appendChild(d);
   }
 }
@@ -496,18 +532,26 @@ function passCell(pass){
 function renderTable(){
   const tb=$('btbody'); tb.innerHTML='';
   const ps=Object.values(positions).sort((a,b)=>(b.openedAt||0)-(a.openedAt||0));
-  if(!ps.length){const tr=document.createElement('tr'); const td=document.createElement('td'); td.colSpan=10; td.style.textAlign='center'; td.textContent='Brak otwartych pozycji'; tr.appendChild(td); tb.appendChild(tr); return;}
+  if(!ps.length){const tr=document.createElement('tr'); const td=document.createElement('td'); td.colSpan=15; td.style.textAlign='center'; td.textContent='Brak otwartych pozycji'; tr.appendChild(td); tb.appendChild(tr); return;}
+  const pctTd=(v)=>{const td=document.createElement('td'); if(v==null||!Number.isFinite(+v)){td.textContent='—'; return td;} td.textContent=fmtPct(+v); td.className=+v>0?'pos':+v<0?'neg':''; return td;};
   for(const p of ps){
     const tr=document.createElement('tr'); const pl=pnlOf(p); const h6=p.h6!=null?p.h6:p.change6h;
     const mk=(txt,cls)=>{const td=document.createElement('td'); if(cls) td.className=cls; td.textContent=txt; return td;};
-    const sym=document.createElement('td'); sym.textContent=p.symbol+(p.chain?' ('+p.chain+')':''); if(p.note) sym.title=p.note;
+    const sym=document.createElement('td'); sym.textContent=showName(p)+(p.chain?' ('+p.chain+')':'');
+    const bits=[p.note, p.symbol&&p.displaySymbol&&p.displaySymbol!==p.symbol?p.symbol:null, p.address?p.address.slice(0,8):null, p.peak!=null?'szczyt '+(p.peak>0?'+':'')+Number(p.peak).toFixed(2)+'%':null];
+    sym.title=bits.filter(Boolean).join(' · ');
     tr.appendChild(sym);
     tr.appendChild(mk((p.side==='LONG'?'▲ ':'▼ ')+p.side));
     tr.appendChild(mk(p.desk?'$'+p.size:String(p.size??'—')));
-    tr.appendChild(mk((Number.isFinite(pl)?fmtPct(pl):'—')+(p.desk&&p.entry==null?' vs ref':''), pl>=0?'pos':'neg'));
-    tr.appendChild(mk(p.h1==null?'—':fmtPct(p.h1), p.h1>0?'pos':p.h1<0?'neg':''));
-    tr.appendChild(mk(h6==null?'—':fmtPct(h6), h6>0?'pos':h6<0?'neg':''));
+    tr.appendChild(mk((Number.isFinite(pl)?fmtPct(pl):'—')+(p.desk&&p.entry==null?' vs ref':''), Number.isFinite(pl)?(pl>=0?'pos':'neg'):''));
+    tr.appendChild(pctTd(p.h1));
+    tr.appendChild(pctTd(h6));
+    tr.appendChild(pctTd(p.change5m));
+    tr.appendChild(pctTd(p.change24h));
     tr.appendChild(mk(fmtK(p.mcap)));
+    tr.appendChild(mk(fmtK(p.fdv)));
+    tr.appendChild(mk(fmtK(p.volume1h)));
+    tr.appendChild(mk(p.holders==null?'—':fmtN(p.holders)));
     tr.appendChild(passCell(p.pass));
     tr.appendChild(mk(p.desk?(p.status||p.bot||''):(p.bot||'')));
     tr.appendChild(mk(p.openedAt?new Date(p.openedAt).toLocaleString('pl-PL',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—'));
@@ -590,7 +634,7 @@ function paintChrome(now){
   const r=rotNow();
   $('rotbar').style.width=(scan&&scan.total? (r.p*100):0)+'%';
   const tok=currentToken();
-  $('rotlabel').textContent=scan&&scan.total?( (r.i+1)+' / '+scan.total+'  ·  '+Math.ceil(r.left/1000)+'s'+(tok?'  ·  '+tok.symbol:'')):'brak skanu';
+  $('rotlabel').textContent=scan&&scan.total?( (r.i+1)+' / '+scan.total+'  ·  '+Math.ceil(r.left/1000)+'s'+(tok?'  ·  '+(heldDisplay(tok)||tok.symbol):'')):'brak skanu';
   setMarquee('news', newsParts()); setMarquee('crypto', cryptoParts());
   tickMarquee('news', 90, now); tickMarquee('crypto', 70, now);
 }
@@ -601,7 +645,7 @@ function updOnline(){
 function hud(){
   const tok=currentToken();
   const head=ticker&&ticker.news&&ticker.news.items&&ticker.news.items[0]&&ticker.news.items[0].title||'';
-  return {scan:tok?tok.symbol:'—', pos:String(Object.keys(positions).length), bank:portfolio&&portfolio.bank!=null?'$'+Math.round(portfolio.bank):'—', headline:head};
+  return {scan:tok?(heldDisplay(tok)||tok.symbol):'—', pos:String(Object.keys(positions).length), bank:portfolio&&portfolio.bank!=null?'$'+Math.round(portfolio.bank):'—', headline:head};
 }
 // ---- socket ----
 const socket=io({autoConnect:true});
@@ -627,7 +671,9 @@ socket.on('posEvents', renderPosEvents);
 socket.on('printer', d=>{if(d&&Number.isFinite(+d.pile)) printerPile=+d.pile;});
 function notePeaks(){
   for(const p of Object.values(positions)){
-    if(p.peak>0){const st=p.peak<=10?0:p.peak<=25?1:p.peak<=50?2:p.peak<=100?3:4; const k=String(p.symbol||'').toUpperCase(); if(riskBadge[k]==null||st>riskBadge[k]) riskBadge[k]=st;}
+    if(!(p.peak>0)) continue;
+    const st=p.peak<=10?0:p.peak<=25?1:p.peak<=50?2:p.peak<=100?3:4;
+    for(const k of [].concat(nameKeys(p.symbol), nameKeys(p.displaySymbol))) if(k&&(riskBadge[k]==null||st>riskBadge[k])) riskBadge[k]=st;
   }
 }
 // ---- input ----

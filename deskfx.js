@@ -19,14 +19,36 @@ function scrub(bot, text){
   return t;
 }
 function keyOf(sym){return String(sym||'').trim().toUpperCase();}
-function notePnl(sym, pct){
-  if(pct==null||!Number.isFinite(pct)) return peaks.get(keyOf(sym))||0;
+function aliasKeys(sym){
   const k=keyOf(sym);
-  const v=Math.max(peaks.get(k)||0, pct);
+  if(!k) return [];
+  const core=k.replace(/^[\p{S}\p{P}\p{Z}]+/gu,'').replace(/[\p{S}\p{P}]+$/gu,'');
+  return core&&core!==k?[k,core]:[k];
+}
+function notePnl(sym, pct){
+  const k=keyOf(sym);
+  if(!k) return null;
+  if(pct==null||!Number.isFinite(+pct)) return peaks.has(k)?peaks.get(k):null;
+  const prev=peaks.has(k)?peaks.get(k):null;
+  const v=prev==null?+pct:Math.max(prev, +pct);
   peaks.set(k, v);
   return v;
 }
-function peak(sym){return peaks.get(keyOf(sym))||0;}
+// One number shared by every alias (ASCII symbol and display name). A negative
+// peak is kept; a later higher print, including from the feed after a restart, wins.
+function notePeaks(names, pct){
+  const keys=[...new Set((names||[]).map(keyOf).filter(Boolean))];
+  if(!keys.length) return null;
+  if(pct==null||!Number.isFinite(+pct)){
+    const vals=keys.filter(k=>peaks.has(k)).map(k=>peaks.get(k));
+    return vals.length?Math.max(...vals):null;
+  }
+  let best=+pct;
+  for(const k of keys) if(peaks.has(k)) best=Math.max(best, peaks.get(k));
+  for(const k of keys) peaks.set(k, best);
+  return best;
+}
+function peak(sym){const k=keyOf(sym); return k&&peaks.has(k)?peaks.get(k):null;}
 function winStage(pct){
   if(!(pct>0)) return 0;
   if(pct<=10) return 0;
@@ -52,10 +74,10 @@ function noteLine(text){
   const table={'STAGE 0':0,'STAGE I':1,'STAGE II':2,'STAGE III':3,'STAGE IV':4};
   const st=table[lab];
   if(st==null) return;
-  const sym=m[1].trim(), k=keyOf(sym), floor=STAGE_FLOOR[st];
-  const prev=peaks.get(k)||0;
-  if(floor>prev){
-    peaks.set(k, floor);
+  const sym=m[1].trim(), keys=aliasKeys(sym), floor=STAGE_FLOOR[st];
+  const prev=notePeaks(keys, null);
+  if(prev==null||floor>prev){
+    notePeaks(keys, floor);
     if(armed) io.emit('deskFx', {kind:'risk', token:sym, stage:st, peak:floor, ts:Date.now()});
   }
 }
@@ -90,13 +112,20 @@ function onActivity(list){
   }
 }
 function onOpen(sym, bot){emit({kind:'stage', level:4, token:sym, bot:bot||'FILLS'});}
-function onClose(sym, pct, net){
-  const peakNow=notePnl(sym, pct>0?pct:null);
+function onClose(sym, pct, net, feedPeak, aliases){
+  const names=[sym].concat(aliases||[]).filter(Boolean);
+  if(feedPeak!=null&&Number.isFinite(+feedPeak)) notePeaks(names, +feedPeak);
+  if(pct!=null&&Number.isFinite(+pct)&&pct>0) notePeaks(names, pct);
+  const peakNow=notePeaks(names, null);
   const loss=(pct!=null&&pct<0)||(pct==null&&net!=null&&net<0);
-  const stage=loss?-1:winStage(Math.max(peakNow||0, pct>0?pct:0));
-  emit({kind:'close', token:sym, pct:pct==null?null:+pct, net:net==null?null:+net, peak:peakNow||0, stage});
+  const basis=peakNow==null?(pct>0?pct:0):Math.max(peakNow, pct>0?pct:peakNow);
+  const stage=loss?-1:winStage(basis);
+  emit({kind:'close', token:sym, pct:pct==null?null:+pct, net:net==null?null:+net, peak:peakNow==null?basis:peakNow, stage});
 }
-function onSell(e){emit({kind:'sell', token:e.token, pct:e.pct, net:e.net, frac:e.frac||null});}
+function onSell(e){
+  if(e&&e.peak!=null&&Number.isFinite(+e.peak)) notePeaks([e.token, e.displaySymbol], +e.peak);
+  emit({kind:'sell', token:(e&&(e.displaySymbol||e.token))||'', pct:e&&e.pct, net:e&&e.net, frac:e&&e.frac||null});
+}
 function takePos(list){
   const fresh=[];
   for(const e of list||[]){
@@ -107,7 +136,7 @@ function takePos(list){
   }
   if(seenPos.size>5000) seenPos.clear();
   for(const e of fresh){
-    if(e.action==='CLOSE') onClose(e.token, e.pct, e.net);
+    if(e.action==='CLOSE') onClose(e.displaySymbol||e.token, e.pct, e.net, e.peak, [e.token, e.displaySymbol]);
     else if(e.action==='SELL') onSell(e);
   }
   return fresh;
@@ -117,5 +146,5 @@ function closeTokens(list){
   for(const e of list||[]) if(e&&e.action==='CLOSE'&&e.token) s.add(keyOf(e.token));
   return s;
 }
-return {scrub, notePnl, peak, winStage, onActivity, onOpen, onClose, takePos, closeTokens, arm(){armed=true;}, armed:()=>armed};
+return {scrub, notePnl, notePeaks, peak, winStage, onActivity, onOpen, onClose, takePos, closeTokens, arm(){armed=true;}, armed:()=>armed};
 };
