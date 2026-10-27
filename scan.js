@@ -2,7 +2,7 @@
 // DexScreener supplies price, changes, volume, txns, FDV, age, image, pool address.
 // GeckoTerminal supplies the 1h OHLCV chart and holder counts. GeckoTerminal is
 // capped at 8 requests/minute (their public guidance is about 10).
-module.exports=function createScan({io,extra}){
+module.exports=function createScan({io,extra,onEnrich}){
 const ROTATE=10000;
 const GT_MAX=8, GT_WIN=60000;
 const NET={
@@ -15,7 +15,7 @@ const num=v=>{const n=typeof v==='number'?v:+v;return Number.isFinite(n)?n:null;
 const nets=chain=>{const k=String(chain||'solana').toLowerCase();return NET[k]||[k,k];};
 function notCheap(it){const s=String(it&&it.stage||'').toLowerCase();return s!=='cheap_reject'&&s!=='chp-'&&s!=='chp';}
 
-let items=[], prev=null, rule='', cycleMs=0, cycleTs=null, rev=0, lastSig='';
+let items=[], extras=[], extraSig='', prev=null, rule='', cycleMs=0, cycleTs=null, rev=0, lastSig='';
 const dex=new Map();   // address -> {at, fail, data}
 const ohlcv=new Map(); // pair -> {at, fail, rows}
 const info=new Map();  // address -> {at, fail, data}
@@ -96,12 +96,35 @@ function snapshot(now){
   try{Object.assign(base, extra?extra():null);}catch{}
   return base;
 }
+function watch(list){
+  const next=[], seen=new Set();
+  for(const x of (Array.isArray(list)?list:[])){
+    const address=x&&x.address; if(!address||seen.has(address)) continue;
+    seen.add(address);
+    next.push({address, chain:x.chain||'solana', symbol:x.symbol||address.slice(0,8), displaySymbol:x.displaySymbol||null});
+  }
+  const sig=next.map(x=>x.address).join(',');
+  if(sig===extraSig) return;
+  extraSig=sig; extras=next;
+}
+function tracked(){
+  const seen=new Set(items.map(i=>i.address).filter(Boolean));
+  return items.concat(extras.filter(x=>x.address&&!seen.has(x.address)));
+}
+function lookup(address){
+  if(!address) return null;
+  const it=tracked().find(x=>x.address===address);
+  if(!it&&!dex.has(address)&&!info.has(address)) return null;
+  const v=view(it||{address, chain:'solana', symbol:''});
+  return (v.sources&&(v.sources.dex||v.sources.chart||v.sources.info))?v:null;
+}
 function maybeEmit(now){
   const idx=indexNow(now);
-  const key=(cycleMs||0)+'|'+idx+'|'+rev;
+  const key=(cycleMs||0)+'|'+idx+'|'+rev+'|'+extraSig;
   if(key===lastKey) return;
   lastKey=key;
   try{io.emit('scan', snapshot(now));}catch(e){console.log('scan emit', e.message);}
+  try{if(onEnrich) onEnrich();}catch(e){console.log('scan enrich', e.message);}
 }
 
 async function getJSON(url, headers){
@@ -117,7 +140,7 @@ function gtBudget(now){
 function markGt(now){gtTimes.push(now);}
 
 async function refreshDex(now){
-  const todo=items.filter(it=>it.address&&(()=>{const d=dex.get(it.address);if(!d)return true;if(d.fail)return now-d.at>120000;return now-d.at>20000;})());
+  const todo=tracked().filter(it=>it.address&&(()=>{const d=dex.get(it.address);if(!d)return true;if(d.fail)return now-d.at>120000;return now-d.at>20000;})());
   if(!todo.length) return;
   const by=new Map();
   for(const it of todo){const [dx]=nets(it.chain);if(!by.has(dx))by.set(dx,[]);by.get(dx).push(it);}
@@ -161,6 +184,7 @@ async function refreshDex(now){
 function pickGt(now, idx){
   const order=[];
   if(items.length){order.push(items[idx]); if(items.length>1) order.push(items[(idx+1)%items.length]);}
+  for(const it of extras) if(!order.includes(it)) order.push(it);
   for(const it of items) if(!order.includes(it)) order.push(it);
   for(const it of order){
     if(!it||!it.address) continue;
@@ -220,7 +244,7 @@ async function runGt(job, now){
 async function tick(){
   const now=Date.now();
   maybeEmit(now);
-  if(busy||!items.length) return;
+  if(busy||(!items.length&&!extras.length)) return;
   busy=true;
   try{
     if(now-dexAt>20000){dexAt=now;await refreshDex(now);}
@@ -230,5 +254,5 @@ async function tick(){
   maybeEmit(Date.now());
 }
 function start(){setInterval(()=>{tick().catch(e=>console.log('scan', e.message));}, 1000);}
-return {setFromTop, snapshot, start, notCheap};
+return {setFromTop, snapshot, start, notCheap, watch, lookup, tick};
 };

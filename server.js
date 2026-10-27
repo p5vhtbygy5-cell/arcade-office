@@ -4,7 +4,7 @@ const app=express(),srv=http.createServer(app),io=new Server(srv);
 const createScan=require('./scan'),createDeskFx=require('./deskfx');
 let lastFeedAt=0;
 const deskFx=createDeskFx({io});
-const scan=createScan({io,extra:()=>({lastFeedAt:lastFeedAt||null})});
+const scan=createScan({io,extra:()=>({lastFeedAt:lastFeedAt||null}),onEnrich:()=>refreshPositionEnrich()});
 scan.start();
 app.use(express.json({limit:'200kb'}));
 app.use(express.static(path.join(__dirname,'public')));
@@ -112,7 +112,7 @@ const allPositions=()=>{const d=Date.now()-lastFeedAt<15*60000?null:deskPosition
 const finTop=v=>typeof v==='number'&&isFinite(v)?v:(typeof v==='string'&&v.trim()!==''&&isFinite(+v)?+v:null);
 function deskItems(l){return (Array.isArray(l)?l:[]).filter(c=>{const s=String(c&&c.stage||'').toLowerCase();return s!=='cheap_reject'&&s!=='chp-'&&s!=='chp';}).slice(0,12).map((c,i)=>({
   rank:i+1,symbol:String(c.ticker??c.symbol??'').replace(/[<>]/g,'').slice(0,40),name:c.name?String(c.name).replace(/[<>]/g,'').slice(0,40):String(c.chain||''),chain:c.chain||null,
-  address:c.address?String(c.address).replace(/[^A-Za-z0-9]/g,'').slice(0,90):null,price:finTop(c.priceUSD??c.price),marketCap:finTop(c.marketCap),fdv:finTop(c.fdv),liquidity:finTop(c.liquidity),
+  address:cleanAddr(c.address),price:finTop(c.priceUSD??c.price),marketCap:finTop(c.marketCap),fdv:finTop(c.fdv),liquidity:finTop(c.liquidity),
   volume:finTop(c.volume??c.volume_h1),change5m:finTop(c.change_5m??c.change5m),change1h:finTop(c.change_1h??c.change1h),change6h:finTop(c.change_6h??c.change6h),
   change24h:finTop(c.change_24h!=null?c.change_24h:c.change24h),buys:finTop(c.buys),sells:finTop(c.sells),holders:finTop(c.holders),stage:c.stage||null,reason:c.reason?String(c.reason).replace(/[<>]/g,'').slice(0,180):''}));}
 // Zlotr 2026-10-22 22:39: top 12 + previous SCAN batch (top10_prev from sync-feed) for the second TOP DESK table
@@ -133,35 +133,53 @@ function cleanPortfolio(p){if(!p||typeof p!=='object')return null;const tr=t=>t&
    series:(Array.isArray(p.series)?p.series:[]).slice(-500).map(x=>({ts:Date.parse(x&&x.ts)||null,bank:fin(x&&x.bank)})).filter(x=>x.ts&&x.bank!=null),
    recent:(Array.isArray(p.recent)?p.recent:[]).slice(0,10).map(x=>({ts:Date.parse(x&&x.ts)||null,kind:x&&x.kind=='close'?'close':'open',token:str(x&&x.token,24),net:fin(x&&x.net),pct:fin(x&&x.pct),size:fin(x&&x.size),partial:!!(x&&x.partial),runner:!!(x&&x.runner),mode:str(x&&x.mode,8)})).filter(x=>x.token)};}const feedSeen=new Set(),feedActivity=[];let posEvents=[];
 // Zlotr 2026-10-22 00:20: position action feed (OPEN / SELL 1/4 / CLOSE) for the panel above the chat
-function cleanPosEvents(a){return (Array.isArray(a)?a:[]).slice(0,50).map(x=>({ts:Date.parse(x&&x.ts)||null,action:['OPEN','SELL','CLOSE'].includes(x&&x.action)?x.action:null,frac:str(x&&x.frac,5),token:str(x&&x.token,20),chain:str(x&&x.chain,16),usd:fin(x&&x.usd),price:fin(x&&x.price),pct:fin(x&&x.pct),net:fin(x&&x.net),reason:str(x&&x.reason,24)})).filter(x=>x.ts&&x.action&&x.token).sort((a,b)=>b.ts-a.ts);}
+function cleanPosEvents(a){return (Array.isArray(a)?a:[]).slice(0,50).map(x=>{const token=cleanSymbol(x&&x.token),displaySymbol=cleanSymbol(x&&x.displaySymbol)||null,name=displaySymbol||token;if(!name)return null;
+  return {ts:Date.parse(x&&x.ts)||null,action:['OPEN','SELL','CLOSE'].includes(x&&x.action)?x.action:null,frac:str(x&&x.frac,5),token:token||name,displaySymbol,address:cleanAddr(x&&x.address),chain:str(x&&x.chain,16),usd:fin(x&&x.usd),price:fin(x&&x.price),pct:fin(x&&x.pct),net:fin(x&&x.net),peak:fin(x&&x.peak),reason:str(x&&x.reason,24)};}).filter(x=>x&&x.ts&&x.action&&x.token).sort((a,b)=>b.ts-a.ts);}
 const FEED_KIND_BOT={scan:'SCAN',vet:'VET',book:'BOOK',size:'SIZE',fills:'FILLS',risk:'RISK',chief:'CHIEF'};
-function cleanSymbol(v){return [...String(v??'').replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'')].slice(0,24).join('').trim();}
+function cleanAddr(v){if(v==null||v==='')return null;const s=String(v).replace(/[^A-Za-z0-9]/g,'').slice(0,90);return s||null;}
+function cleanSymbol(v){return [...String(v??'').replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'')].slice(0,32).join('').trim();}
 function livePnl(p){const b=p.pnlBase;if(b==null||!isFinite(b)||!b||p.price==null||!isFinite(+p.price))return null;return (p.price-b)/b*100*(p.side==='SHORT'?-1:1);}
+const enrSig=new WeakMap();
+function enrichPosition(p){if(!p||!p.address)return false;const v=scan.lookup(p.address);if(!v)return false;
+  const sig=[v.change5m,v.change1h,v.change6h,v.change24h,v.volume1h,v.fdv,v.marketCap,v.buys1h,v.sells1h,v.holders,v.pairCreatedAt,v.chart&&v.chart.length].join(',');
+  if(enrSig.get(p)===sig)return false;enrSig.set(p,sig);
+  if(p.h1==null&&v.change1h!=null)p.h1=v.change1h;
+  if(p.h6==null&&p.change6h==null&&v.change6h!=null){p.h6=v.change6h;p.change6h=v.change6h;}
+  if(p.mcap==null&&v.marketCap!=null)p.mcap=v.marketCap;
+  p.change5m=v.change5m;p.change24h=v.change24h;p.volume1h=v.volume1h;p.fdv=v.fdv;p.buys1h=v.buys1h;p.sells1h=v.sells1h;p.pairCreatedAt=v.pairCreatedAt;p.holders=v.holders;p.holdersTop10=v.holdersTop10;
+  if(v.chart)p.chart=v.chart;if(v.image&&!p.image)p.image=v.image;return true;}
+function refreshPositionEnrich(){let changed=false;for(const p of Object.values(positions))if(p&&p.feed&&enrichPosition(p))changed=true;if(changed)io.emit('positions',allPositions());}
 function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['body: obiekt JSON']};
   const ps=b.positions,acts=b.activity??[];if(!Array.isArray(ps))errs.push('positions: tablica');if(!Array.isArray(acts))errs.push('activity: tablica');
   const clean=[];if(Array.isArray(ps))ps.slice(0,50).forEach((p,i)=>{const e=[];const id=String(p&&p.id||'');if(!/^[A-Za-z0-9_.:-]{1,80}$/.test(id))e.push('id');
-    const bot=String(p.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))e.push('bot');const symbol=cleanSymbol(p.symbol);if(!symbol)e.push('symbol');
+    const bot=String(p.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))e.push('bot');
+    let symbol=cleanSymbol(p&&p.symbol);const displaySymbol=cleanSymbol(p&&p.displaySymbol)||null;if(!symbol&&displaySymbol)symbol=displaySymbol;
     const side=String(p.side||'LONG').toUpperCase();if(!['LONG','SHORT'].includes(side))e.push('side');const mode=String(p.mode||'SHADOW').toUpperCase();if(!['REAL','SHADOW'].includes(mode))e.push('mode');
     const size=p.size==null?null:pos(p.size),entry=p.entry==null?null:pos(p.entry),price=p.price==null?null:pos(p.price),ref=p.refPrice==null?null:pos(p.refPrice);
     if(p.size!=null&&size==null)e.push('size');if(p.entry!=null&&entry==null)e.push('entry');if(p.price!=null&&price==null)e.push('price');if(p.refPrice!=null&&ref==null)e.push('refPrice');
+    // A symbol that filters down to nothing drops or is repaired from displaySymbol. Other field errors still reject the feed.
+    if(!symbol){if(e.length)errs.push(`positions[${i}]: `+e.join(','));return;}
     if(e.length)return errs.push(`positions[${i}]: `+e.join(','));
     // Zlotr 2026-10-23 21:34: positions carry mcap, h1, h6/change6h, pass{n,wins,losses} for TABLICA
-    clean.push({id:'feed-'+id.replace(/[^A-Za-z0-9_-]/g,'_'),feedId:id,feed:true,desk:true,bot,symbol,side,mode,size,sizeUsd:size,entry,ref,pnlBase:entry??ref,price,
+    clean.push({id:'feed-'+id.replace(/[^A-Za-z0-9_-]/g,'_'),feedId:id,feed:true,desk:true,bot,symbol,displaySymbol,address:cleanAddr(p.address),peakPct:fin(p.peakPct),side,mode,size,sizeUsd:size,entry,ref,pnlBase:entry??ref,price,
       chain:p.chain?String(p.chain).slice(0,20):null,status:p.status?String(p.status).replace(/[<>]/g,'').slice(0,200):'',note:[p.chain,p.status].filter(Boolean).join(' · ').replace(/[<>]/g,'').slice(0,200),
       tiers:(Number.isInteger(p.tiers)&&p.tiers>=0&&p.tiers<=4)?p.tiers:0,h1:fin(p.h1),h6:fin(p.h6??p.change6h),change6h:fin(p.change6h??p.h6),mcap:fin(p.mcap),pass:(p.pass&&typeof p.pass==='object')?{n:Math.max(0,fin(p.pass.n)|0),wins:Math.max(0,fin(p.pass.wins)|0),losses:Math.max(0,fin(p.pass.losses)|0)}:{n:0,wins:0,losses:0},openedAt:Date.parse(p.openedAt)||Date.now(),updatedAt:Date.now(),priceSource:'desk'});});
   if(errs.length)return {error:errs};
   lastFeedAt=Date.now();const res={opened:[],updated:[],closed:[],activity:0};const ids=new Set(clean.map(p=>p.id));
-  const skipClose=new Set();if(Array.isArray(b.posEvents))for(const e of b.posEvents)if(e&&e.action==='CLOSE'&&e.token)skipClose.add(String(e.token).toUpperCase());
-  for(const p of clean){const lp=livePnl(p);if(lp!=null)deskFx.notePnl(p.symbol,lp);p.peak=deskFx.peak(p.symbol)||null;const old=positions[p.id];positions[p.id]=p;io.emit('position',p);
-    if(!old){res.opened.push(p.id);botSay(p.bot,`Otwieram ${p.side} ${p.symbol}`);bots.onPosition('open',p);deskFx.onOpen(p.symbol,p.bot);}else res.updated.push(p.id);}
+  scan.watch(clean.filter(p=>p.address).map(p=>({address:p.address,chain:p.chain,symbol:p.symbol,displaySymbol:p.displaySymbol})));
+  const skipClose=new Set(),closePeak=new Map();
+  if(Array.isArray(b.posEvents))for(const e of b.posEvents)if(e&&e.action==='CLOSE'){const pk=fin(e.peak);if(e.token){skipClose.add(cleanSymbol(e.token).toUpperCase());if(pk!=null)closePeak.set(cleanSymbol(e.token).toUpperCase(),pk);}if(e.displaySymbol){skipClose.add(cleanSymbol(e.displaySymbol).toUpperCase());if(pk!=null)closePeak.set(cleanSymbol(e.displaySymbol).toUpperCase(),pk);}}
+  for(const p of clean){const names=[p.symbol,p.displaySymbol];if(p.peakPct!=null)deskFx.notePeaks(names,p.peakPct);const lp=livePnl(p);if(lp!=null)deskFx.notePeaks(names,lp);p.peak=deskFx.notePeaks(names,null);enrichPosition(p);const old=positions[p.id];positions[p.id]=p;io.emit('position',p);
+    const shown=p.displaySymbol||p.symbol;if(!old){res.opened.push(p.id);botSay(p.bot,`Otwieram ${p.side} ${shown}`);bots.onPosition('open',p);deskFx.onOpen(shown,p.bot);}else res.updated.push(p.id);}
   for(const p of Object.values(positions))if(p.feed&&!ids.has(p.id)){delete positions[p.id];io.emit('positionClosed',p.id);res.closed.push(p.id);
-    const cr=(b.closeReasons&&typeof b.closeReasons=='object')?b.closeReasons[p.feedId]:null;const b0=p.pnlBase,pl0=b0&&p.price?(p.price-b0)/b0*100*(p.side==='LONG'?1:-1):null;const pl=cr&&fin(cr.pct)!=null?fin(cr.pct):pl0;const why=cr&&cr.reason?' - '+str(cr.reason,90):'';botSay(p.bot,`Zamykam ${p.symbol}${pl!=null?` (${pl>=0?'+':''}${pl.toFixed(2)}%)`:''}${why}`);bots.onPosition('close',p);
-    if(!skipClose.has(String(p.symbol).toUpperCase()))deskFx.onClose(p.symbol,pl,cr&&fin(cr.net));}
+    const cr=(b.closeReasons&&typeof b.closeReasons=='object')?b.closeReasons[p.feedId]:null;const b0=p.pnlBase,pl0=b0&&p.price?(p.price-b0)/b0*100*(p.side==='LONG'?1:-1):null;const pl=cr&&fin(cr.pct)!=null?fin(cr.pct):pl0;const why=cr&&cr.reason?' - '+str(cr.reason,90):'';const shown=p.displaySymbol||p.symbol;botSay(p.bot,`Zamykam ${shown}${pl!=null?` (${pl>=0?'+':''}${pl.toFixed(2)}%)`:''}${why}`);bots.onPosition('close',p);
+    const fromEv=closePeak.get(String(p.symbol||'').toUpperCase());const fromDisp=p.displaySymbol?closePeak.get(String(p.displaySymbol).toUpperCase()):null;const feedPeak=fin(cr&&cr.peak)!=null?fin(cr&&cr.peak):(fromEv!=null?fromEv:(fromDisp!=null?fromDisp:null));
+    if(!skipClose.has(String(p.symbol||'').toUpperCase())&&!(p.displaySymbol&&skipClose.has(String(p.displaySymbol).toUpperCase())))deskFx.onClose(shown,pl,cr&&fin(cr.net),feedPeak,[p.symbol,p.displaySymbol]);}
   save();io.emit('positions',allPositions());
   // activity -> chat + bubbles (+ errand when the bot is idle); first feed only marks history as seen
   const first=feedSeen.size===0;const fresh=[];
   for(const a of (Array.isArray(acts)?acts.slice(-200):[])){if(!a)continue;const bot=String(a.bot||'').toUpperCase();if(!BOT_NAMES.includes(bot))continue;
-    const text=deskFx.scrub(bot,String(a.text||'').replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').slice(0,240));if(!text)continue;const ts=String(a.ts||'');const k=ts+'|'+bot+'|'+text;if(feedSeen.has(k))continue;feedSeen.add(k);
+    const text=deskFx.scrub(bot,String(a.text||'').replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').slice(0,240));if(!text)continue;const ts=String(a.ts||'');const k=ts+'|'+bot+'|'+text;if(feedSeen.has(k))continue;feedSeen.add(k);
     const item={ts,bot,text,kind:String(a.kind||'').slice(0,40)};const prev=feedActivity[feedActivity.length-1];
     // Zlotr 2026-10-25 01:10: same bot + same text (ignoring HH:MM) as previous line -> refresh time, no new chat line
     if(prev&&prev.bot===bot&&noTm(prev.text)===noTm(text)){prev.ts=ts;prev.text=text;continue;}
@@ -183,7 +201,7 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   if(b.news&&typeof b.news==='object'&&Array.isArray(b.news.items)){const items=b.news.items.slice(0,20).map(x=>({title:String(x&&x.title||'').replace(/[<>]/g,'').slice(0,140),source:String(x&&x.source||'').replace(/[<>]/g,'').slice(0,40),category:String(x&&x.category||'').slice(0,20),publishedAt:+(x&&x.publishedAt)||null})).filter(x=>x.title);
     if(items.length){feedNews={items,updatedAt:Date.parse(b.news.updatedAt)||Date.now(),error:null,source:'feed:'+String(b.news.source||'desk').slice(0,30)};io.emit('ticker',tickerOut());}}
   if(b.botEvents&&typeof b.botEvents==='object'){const ev={};for(const n of BOT_NAMES){const l=b.botEvents[n];ev[n]=(Array.isArray(l)?l:[]).slice(0,10).map(x=>({ts:String(x&&x.ts||'').slice(0,40),
-     text:deskFx.scrub(n,String(x&&x.text||'').replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').replace(/0x[0-9a-fA-F]{6,}/g,'').replace(/[1-9A-HJ-NP-Za-km-z]{40,}/g,'').replace(/\s+/g,' ').trim()).slice(0,200)})).filter(x=>x.text);}bots.setEvents(ev);}
+     text:deskFx.scrub(n,String(x&&x.text||'').replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').replace(/0x[0-9a-fA-F]{6,}/g,'').replace(/[1-9A-HJ-NP-Za-km-z]{40,}/g,'').replace(/\s+/g,' ').trim()).slice(0,200)})).filter(x=>x.text);}bots.setEvents(ev);}
   if(Array.isArray(b.posEvents)){posEvents=cleanPosEvents(b.posEvents);io.emit('posEvents',posEvents);deskFx.takePos(posEvents);}
   deskFx.onActivity(fresh);deskFx.arm();
   if(b.portfolio!==undefined){const pf=cleanPortfolio(b.portfolio);if(pf){portfolio=pf;io.emit('portfolio',portfolio);}}
