@@ -10,9 +10,9 @@ function astar(s,g,avoid){if(!walk(...g))return null;const K=(x,y)=>y*MAP.W+x,op
    const ng=gc+1;if(ng<(gs.get(nk)??1e9)){gs.set(nk,ng);prev.set(nk,k);open.push([nx,ny,ng,ng+Math.abs(nx-g[0])+Math.abs(ny-g[1])]);}}}return null;}
 const deskOf=n=>MAP.furniture.find(f=>f.type=='botdesk'&&f.label==n);
 const deskFront=n=>{const d=deskOf(n);return [d.x+1,d.y+2];};
-const SPOT={board:()=>[14+(Math.random()*12|0),6],top10:()=>[2+(Math.random()*11|0),6],cabinet:()=>[32,10],chief:()=>[5+(Math.random()*3|0),24],
- printer:()=>[36,12],coffee:()=>[16,22],fridge:()=>[13,23],wc:()=>[36,24],walk:()=>rnd([[13,13],[8,13],[22,13],[26,13],[10,18],[30,18],[34,13],[32,7]])};
-const CHATS=[[[14,25],[16,25]],[[16,13],[18,13]],[[30,8],[32,8]],[[4,18],[6,18]]];
+const SPOT={board:()=>[12+(Math.random()*12|0),2],top10:()=>[1+(Math.random()*11|0),2],cabinet:()=>[21,4],chief:()=>[4+(Math.random()*3|0),15],
+ printer:()=>[34,7],coffee:()=>[14,13],fridge:()=>[12,14],wc:()=>[34,15],walk:()=>rnd([[10,6],[16,6],[22,5],[29,8],[3,10],[14,10],[24,10],[30,3]])};
+const CHATS=[[[15,14],[17,14]],[[22,8],[24,8]],[[28,4],[30,4]],[[2,6],[4,6]]];
 const LINES={
  CHIEF:{chat:['Jak wyniki?','Trzymamy dyscyplinę.','Dobra robota.','Plan na dziś aktualny.'],report:['Dzięki, notuję.','OK, działaj dalej.','Pilnuj limitów.'],walk:['Jak idzie, zespole?','Obchód biura...']},
  SIZE:{chat:['Max 2% na pozycję.','Kelly mówi: mniej.','Przeliczyłem wielkości.'],report:['Wielkości przeliczone.','Ekspozycja w normie.'],board:['Przeliczam wielkości...','Sizing się zgadza.']},
