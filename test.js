@@ -140,6 +140,21 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  chk(gf2.activity.some(a=>a.text.includes('Inuween')&&a.text.includes('███WIF')&&a.text.includes('🚀')&&a.text.includes('żółć')&&!a.text.includes('\u0001')&&!a.text.includes('\u202e')),'Aktywność trzyma Unicode, bez sterujących i bidi');
  const bev=await fetch('http://localhost:3999/api/bot-events').then(r=>r.json());
  chk(bev.RISK&&bev.RISK.some(x=>x.text.includes('███WIF')&&x.text.includes('🚀')&&x.text.includes('Inuween')),'botEvents trzymają Unicode');
+ const live={positions:[
+   {id:'2026-10-27T0101230100',bot:'RISK',symbol:'PRESIDENT',displaySymbol:'PRESIDENT',address:'MintPres+1',peakPct:1.2,side:'LONG',mode:'SHADOW',size:40,entry:0.00024,price:0.00015,chain:'solana',openedAt:'2026-10-27T01:01:23+01:00'},
+   {id:'2026-10-27T1147570100',bot:'RISK',symbol:'INUWEEN',displaySymbol:'Inuween',address:'MintInu/2',peakPct:-3.5,side:'LONG',mode:'SHADOW',size:40,entry:0.006,price:0.0045,chain:'solana'},
+   {id:'2026-10-27T1329020100',bot:'RISK',symbol:'NOTHING',displaySymbol:'Nothing',side:'LONG',mode:'SHADOW',size:40,entry:0.0014,price:0.0009,chain:'solana'}
+ ],activity:[],portfolio:{start:500,bank:459.17,realizedPnl:-40.83,roiPct:-8.17,trades:20,wins:15,losses:5,open_full:5,open_tiers:[0,0,0,0],tiers:[0,0,0],partial:1,closes:19,mode:'SHADOW',best:{token:'███',displaySymbol:'███WIF',net:16.61,pct:41.52},worst:{token:'ELON2028',net:-34.66,pct:-86.66},series:[{ts:'2026-10-26T12:00:00Z',bank:500},{ts:'2026-10-27T12:00:00Z',bank:459.17}]},
+  posEvents:[{ts:'2026-10-27T12:00:00Z',action:'CLOSE',token:'███',displaySymbol:'███WIF',peak:41.52,pct:41.52,net:16.61,chain:'solana'}]};
+ fr=await fp(live);chk(fr.s===200,'Payload jak z desku (PRESIDENT, Inuween, Nothing) -> 200');
+ const api=await fetch(F).then(r=>r.json());
+ const names=api.positions.map(p=>p.displaySymbol||p.symbol);
+ chk(api.positions.length===3&&names.includes('Inuween')&&names.includes('PRESIDENT')&&names.includes('Nothing'),'GET /api/feed trzyma otwarte pozycje desku');
+ let pf=await fetch('http://localhost:3999/api/portfolio').then(r=>r.json());
+ chk(pf.trades===20&&pf.openFull===5&&pf.best&&pf.best.displaySymbol==='███WIF'&&pf.best.token==='███'&&pf.closeStages==null,'TRADES zostaje 20, a nie openFull 5; NAJL ma ███WIF; puste etapy nie wchodzą');
+ fr=await fp({positions:live.positions,activity:[],portfolio:Object.assign({},live.portfolio,{wins:1,trades:1,losses:0}),posEvents:live.posEvents});
+ pf=await fetch('http://localhost:3999/api/portfolio').then(r=>r.json());
+ chk(fr.s===200&&pf.closeStages&&pf.closeStages[2]===1&&pf.closeStages.reduce((a,b)=>a+b,0)===pf.wins,'Peak 41.52 liczy się jako etap II, suma = wins');
  fc.disconnect();
  const createScan=require('./scan.js');
  const origFetch=global.fetch; let calls=[];

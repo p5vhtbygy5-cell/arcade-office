@@ -20,7 +20,7 @@ window.AO_FLAP='"Barlow Condensed","Noto Sans","Noto Sans Symbols","Noto Sans Sy
 html,body{margin:0;height:100%;background:#03060c;color:var(--ink);font-family:var(--ui);overflow:hidden}
 #fit{position:fixed;inset:0}
 #stage{position:absolute;left:0;top:0;width:3840px;height:2160px;transform-origin:0 0;
- display:grid;grid-template-columns:1580px 1fr 1fr;grid-template-rows:150px minmax(0,1.22fr) minmax(0,0.78fr) 360px 74px 74px;gap:16px;padding:16px;
+ display:grid;grid-template-columns:1580px 1fr 1fr;grid-template-rows:150px minmax(0,0.9fr) minmax(0,1.2fr) 460px 64px 64px;gap:16px;padding:16px;
  background:radial-gradient(900px 480px at 78% 8%, rgba(255,61,138,.16), transparent 60%),radial-gradient(800px 420px at 8% 100%, rgba(62,224,255,.12), transparent 55%),#070b14}
 #stage>*{min-width:0;min-height:0}
 #top{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:22px;padding:0 8px}
@@ -80,7 +80,7 @@ button.on{background:#12343c;color:var(--cyan);border-color:var(--cyan)}
 #scanFoot b{color:var(--ink);font-weight:600}
 #posBody,#portBody{position:relative;flex:1;min-height:0}
 #posBody canvas{position:absolute;left:12px;top:8px;width:calc(100% - 24px);height:calc(100% - 16px)}
-#portBody{display:grid;grid-template-columns:1.15fr .85fr}
+#portBody{display:grid;grid-template-columns:1.9fr .38fr}
 #portBody .slot,#portBody .chart{position:relative;min-height:0}
 #plist,#log{flex:1;overflow:auto;padding:8px 16px 12px;font-size:26px;line-height:1.35}
 #plist div{margin:0 0 6px;overflow-wrap:anywhere}
@@ -105,7 +105,7 @@ button.on{background:#12343c;color:var(--cyan);border-color:var(--cyan)}
 #toast{position:absolute;left:50%;top:170px;transform:translateX(-50%);z-index:7;pointer-events:none;opacity:0;
  font-size:54px;font-weight:700;letter-spacing:.08em;padding:12px 28px;border-radius:14px;background:rgba(6,10,18,.82);border:1px solid var(--line);text-shadow:0 0 18px rgba(0,0,0,.6)}
 .overlay{display:none;position:absolute;z-index:8;left:120px;right:120px;top:180px;bottom:160px;padding:22px 26px}
-.overlay.show{display:block}
+.overlay.show{display:flex;flex-direction:column;overflow:auto}
 .overlay table{width:100%;border-collapse:collapse;font-size:26px}
 .overlay th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--cyan);color:#c9f6ff;font-weight:600}
 .overlay td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap}

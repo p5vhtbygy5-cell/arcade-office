@@ -39,30 +39,35 @@ function create(canvas, opts){
   const startDelay=opts.startDelay||0;
   const flickerMs=opts.flicker||520;
   const maxCell=opts.maxCell||110;
+  const flipMs=opts.flipMs||160;
   const onRow=opts.onRow||null;
   let desired=[];
   let pending=null;
   let grid=null;
-  let lastW=0, lastH=0;
+  let lastW=0, lastH=0, lastL=null, flips=0;
 
   function layout(w, h, rows){
     const texts=rows.map(r=>graphs(r.text||''));
     const natural=Math.max(1, ...texts.map(t=>t.length), 1);
-    const gap=Math.max(2, Math.round(Math.min(w, h)*0.008));
+    const rowsN=Math.max(1, rows.length);
+    const gap=Math.max(2, Math.min(6, Math.round(Math.min(w, h)*0.008)));
     let cols=natural;
     let cellW=Math.floor((w-gap*(cols-1))/cols);
+    const maxH=Math.max(8, Math.floor((h-gap*(rowsN-1))/rowsN));
     if(cellW>maxCell){
-      cols=Math.max(natural, Math.floor((w+gap)/(maxCell+gap)));
+      const target=Math.min(maxCell, maxH);
+      cols=Math.max(natural, Math.floor((w+gap)/(target+gap)));
       cellW=Math.floor((w-gap*(cols-1))/cols);
     }
-    const rowsN=Math.max(1, rows.length);
-    let cellH=Math.floor(cellW*1.18);
-    const maxH=Math.floor((h-gap*(rowsN-1))/rowsN);
-    if(cellH>maxH) cellH=Math.max(8, maxH);
-    cellW=Math.max(6, Math.min(cellW, Math.floor(cellH/1.05)));
+    let cellH=Math.min(maxH, Math.max(8, Math.floor(cellW*1.12)));
+    const square=Math.floor(cellH/1.02);
+    if(cellW>square) cellW=square;
+    const fitW=Math.floor((w-gap*(cols-1))/cols);
+    if(cellW>fitW) cellW=Math.max(4, fitW);
+    if(rowsN*cellH+gap*(rowsN-1)>h) cellH=Math.max(4, Math.floor((h-gap*(rowsN-1))/rowsN));
     const gridW=cols*cellW+gap*(cols-1);
     const gridH=rowsN*cellH+gap*(rowsN-1);
-    return {cols, rowsN, cellW, cellH, gap, texts,
+    return {cols, rowsN, cellW, cellH, gap, texts, gridW, gridH,
       ox:Math.max(0, Math.floor((w-gridW)/2)),
       oy:Math.max(0, Math.floor((h-gridH)/2))};
   }
@@ -70,14 +75,19 @@ function create(canvas, opts){
     if(grid&&grid.cols===cols&&grid.rows.length===rowsN) return;
     const rows=[];
     for(let r=0;r<rowsN;r++){
+      const old=grid&&grid.rows[r];
       const tiles=[];
-      for(let c=0;c<cols;c++) tiles.push(blank());
+      for(let c=0;c<cols;c++){
+        const prev=old&&old.tiles[c];
+        tiles.push(prev?{target:prev.target, color:prev.color, shown:prev.shown, flipFrom:prev.flipFrom, flipTo:prev.flipTo, flipStart:prev.flipStart, flipDur:prev.flipDur, flicker:false, nextFlick:0, settleAt:0}:blank());
+      }
       rows.push({tiles, settled:true, settleAt:0});
     }
     grid={cols, rows};
   }
   function writeTargets(L, now, mode){
     ensure(L.cols, L.rowsN);
+    const quiet=mode==='patch'||mode==='settle';
     for(let r=0;r<L.rowsN;r++){
       const src=desired[r]||{text:'', colors:null};
       const text=L.texts[r]||[];
@@ -86,13 +96,15 @@ function create(canvas, opts){
         const ch=text[c]||' ';
         const color=(colors&&colors[c])||DEFAULT;
         const tile=grid.rows[r].tiles[c];
-        const changed=tile.target!==ch||tile.color!==color;
+        const already=tile.shown===ch&&!tile.flipStart;
+        const inflight=!!(tile.flipStart&&tile.flipTo===ch);
         tile.target=ch; tile.color=color;
-        if(mode==='patch'&&changed&&!tile.flicker){
+        if(quiet&&!already&&!inflight&&!tile.flicker&&tile.shown!==ch){
           tile.flipFrom=tile.shown||' ';
           tile.flipTo=ch;
           tile.flipStart=now;
-          tile.flipDur=150;
+          tile.flipDur=flipMs;
+          flips++;
         }
       }
     }
@@ -177,6 +189,7 @@ function create(canvas, opts){
     ctx.imageSmoothingEnabled=true;
     const rows=desired.length?desired:[{text:''}];
     const L=layout(w, h, rows);
+    lastL=L;
     if(pending||!grid||grid.cols!==L.cols||grid.rows.length!==L.rowsN||w!==lastW||h!==lastH){
       const mode=pending||(grid?'patch':'cascade');
       lastW=w; lastH=h;
@@ -209,7 +222,11 @@ function create(canvas, opts){
       }
     }
   }
-  return {setRows, resize, frame, canvas};
+  function metrics(){
+    return {flips, cellW:lastL&&lastL.cellW||0, cellH:lastL&&lastL.cellH||0, cols:lastL&&lastL.cols||0, rows:lastL&&lastL.rowsN||0, gridW:lastL&&lastL.gridW||0, gridH:lastL&&lastL.gridH||0,
+      lines:desired.map(r=>r.text)};
+  }
+  return {setRows, resize, frame, canvas, metrics, resetStats(){flips=0;}};
 }
 function clearCache(){cache.clear();}
 root.FLAP={create, graphs, clearCache};

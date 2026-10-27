@@ -127,11 +127,27 @@ app.get('/api/top10',(q,r)=>r.json(deskTop10()||top10));
 // ---- POST /api/feed: desk state pushed by sync-feed.js (contract: /workspace/desk/OFFICE_FEED.md) ----
 let portfolio=null; // portfolio history from the feed (optional field, real desk data only)
 const fin=v=>typeof v=='number'&&isFinite(v)?v:null,str=(v,n=40)=>v==null?null:String(v).replace(/[<>]/g,'').slice(0,n);
-function cleanPortfolio(p){if(!p||typeof p!=='object')return null;const tr=t=>t&&typeof t=='object'?{token:str(t.token,24),net:fin(t.net),pct:fin(t.pct),closed:str(t.closed),partial:!!t.partial}:null;
+function nameField(v){const s=cleanSymbol(v);return s||null;}
+function stageList(arr){if(!Array.isArray(arr)||arr.length<5)return null;const s=[0,1,2,3,4].map(i=>{const n=Number(arr[i]);return Number.isFinite(n)?Math.max(0,n|0):0;});return s.some(n=>n>0)?s:null;}
+function sumStages(s){return s.reduce((a,b)=>a+b,0);}
+function pickStages(raw, events, pf){
+  const sent=stageList(raw&&(raw.closeStages||raw.close_stages))||stageList(raw&&raw.stages);
+  const ok=s=>s&&(sumStages(s)===pf.wins||sumStages(s)===pf.trades||(pf.closes!=null&&sumStages(s)===pf.closes));
+  if(ok(sent)) return sent;
+  const hist=[0,0,0,0,0];
+  for(const e of events||[]){
+    if(!e||e.action!=='CLOSE'||(e.pct!=null&&e.pct<0)) continue;
+    const basis=e.peak!=null?e.peak:(e.pct>0?e.pct:0);
+    const st=deskFx.winStage(basis);
+    if(st>=0&&st<=4) hist[st]++;
+  }
+  return ok(hist)?hist:null;
+}
+function cleanPortfolio(p){if(!p||typeof p!=='object')return null;const tr=t=>{if(!t||typeof t!=='object')return null;const displaySymbol=nameField(t.displaySymbol),token=nameField(t.token)||displaySymbol;if(!token)return null;return {token,displaySymbol,net:fin(t.net),pct:fin(t.pct),closed:str(t.closed,40),partial:!!t.partial};};
   return {start:fin(p.start)??1000,bank:fin(p.bank),realizedPnl:fin(p.realizedPnl),roiPct:fin(p.roiPct),trades:Math.max(0,fin(p.trades)|0),partial:Math.max(0,fin(p.partial)|0),closes:fin(p.closes)==null?null:Math.max(0,p.closes|0),tiers:Array.isArray(p.tiers)?[0,1,2].map(i=>Math.max(0,fin(p.tiers[i])|0)):null,openFull:fin(p.open_full)==null?null:Math.max(0,p.open_full|0),openTiers:Array.isArray(p.open_tiers)?[0,1,2,3].map(i=>Math.max(0,fin(p.open_tiers[i])|0)):null,wins:Math.max(0,fin(p.wins)|0),losses:Math.max(0,fin(p.losses)|0),
    winRate:fin(p.winRate),maxDrawdownPct:fin(p.maxDrawdownPct),maxDrawdownUsd:fin(p.maxDrawdownUsd),best:tr(p.best),worst:tr(p.worst),mode:str(p.mode,8),updatedAt:str(p.updatedAt),receivedAt:Date.now(),
    series:(Array.isArray(p.series)?p.series:[]).slice(-500).map(x=>({ts:Date.parse(x&&x.ts)||null,bank:fin(x&&x.bank)})).filter(x=>x.ts&&x.bank!=null),
-   recent:(Array.isArray(p.recent)?p.recent:[]).slice(0,10).map(x=>({ts:Date.parse(x&&x.ts)||null,kind:x&&x.kind=='close'?'close':'open',token:str(x&&x.token,24),net:fin(x&&x.net),pct:fin(x&&x.pct),size:fin(x&&x.size),partial:!!(x&&x.partial),runner:!!(x&&x.runner),mode:str(x&&x.mode,8)})).filter(x=>x.token)};}const feedSeen=new Set(),feedActivity=[];let posEvents=[];
+   recent:(Array.isArray(p.recent)?p.recent:[]).slice(0,10).map(x=>{const displaySymbol=nameField(x&&x.displaySymbol),token=nameField(x&&x.token)||displaySymbol;return {ts:Date.parse(x&&x.ts)||null,kind:x&&x.kind=='close'?'close':'open',token,displaySymbol,net:fin(x&&x.net),pct:fin(x&&x.pct),size:fin(x&&x.size),partial:!!(x&&x.partial),runner:!!(x&&x.runner),mode:str(x&&x.mode,8)};}).filter(x=>x.token)};}const feedSeen=new Set(),feedActivity=[];let posEvents=[];
 // Zlotr 2026-10-22 00:20: position action feed (OPEN / SELL 1/4 / CLOSE) for the panel above the chat
 function cleanPosEvents(a){return (Array.isArray(a)?a:[]).slice(0,50).map(x=>{const token=cleanSymbol(x&&x.token),displaySymbol=cleanSymbol(x&&x.displaySymbol)||null,name=displaySymbol||token;if(!name)return null;
   return {ts:Date.parse(x&&x.ts)||null,action:['OPEN','SELL','CLOSE'].includes(x&&x.action)?x.action:null,frac:str(x&&x.frac,5),token:token||name,displaySymbol,address:cleanAddr(x&&x.address),chain:str(x&&x.chain,16),usd:fin(x&&x.usd),price:fin(x&&x.price),pct:fin(x&&x.pct),net:fin(x&&x.net),peak:fin(x&&x.peak),reason:str(x&&x.reason,24)};}).filter(x=>x&&x.ts&&x.action&&x.token).sort((a,b)=>b.ts-a.ts);}
@@ -204,7 +220,7 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
      text:deskFx.scrub(n,String(x&&x.text||'').replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').replace(/0x[0-9a-fA-F]{6,}/g,'').replace(/[1-9A-HJ-NP-Za-km-z]{40,}/g,'').replace(/\s+/g,' ').trim()).slice(0,200)})).filter(x=>x.text);}bots.setEvents(ev);}
   if(Array.isArray(b.posEvents)){posEvents=cleanPosEvents(b.posEvents);io.emit('posEvents',posEvents);deskFx.takePos(posEvents);}
   deskFx.onActivity(fresh);deskFx.arm();
-  if(b.portfolio!==undefined){const pf=cleanPortfolio(b.portfolio);if(pf){portfolio=pf;io.emit('portfolio',portfolio);}}
+  if(b.portfolio!==undefined){const pf=cleanPortfolio(b.portfolio);if(pf){pf.closeStages=pickStages(b.portfolio,posEvents,pf);portfolio=pf;io.emit('portfolio',portfolio);}}
   return res;}
 app.post('/api/feed',auth,(q,r)=>{const res=applyFeed(q.body);if(res.error)return r.status(400).json({error:'Błędne dane',details:res.error});r.json({ok:true,...res});});
 const noTm=t=>String(t||'').replace(/^\d\d:\d\d /,'');
