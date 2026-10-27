@@ -27,7 +27,7 @@ add('wallscreen',1,0,11,2,{label:'SKANER',screen:'scan'});add('wallscreen',12,0,
 // --- bot desks in a tight 3x2 cluster: desk 3x2 + role equipment tile to the right ---
 const ROLE_ITEM={SIZE:'scales',SCAN:'radar',BOOK:'cabinet',RISK:'alarm',VET:'stampdesk',FILLS:'printer'};
 const BOT_DESKS=[];
-['SIZE','SCAN','BOOK','RISK','VET','FILLS'].forEach((n,i)=>{const x=5+(i%3)*6,y=i<3?4:8;
+['SIZE','SCAN','BOOK','RISK','VET','FILLS'].forEach((n,i)=>{const x=5+(i%3)*6,y=i<3?5:8;
  add('botdesk',x,y,3,2,{label:n});add(ROLE_ITEM[n],x+3,y,1,1,{label:n});BOT_DESKS.push({name:n,x:(x+1.5)*T,y:(y-0.5)*T});});
 add('watercooler',1,4);add('copier',1,8,2,1);add('plant',1,10);add('plant',21,10);add('plant',31,10);
 add('holotable',25,6,3,2);add('supercomputer',32,4,5,3);add('boiler',35,9,2,2); // supercomputer printer faces tile 34,7

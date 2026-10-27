@@ -1,5 +1,17 @@
-# Krypto Biuro – wirtualne biuro (styl Game Boy) 🎮
-Wirtualne biuro multiplayer w stylu klasycznej konsoli Game Boy (4 odcienie zieleni, kafelki 16×16, okno dialogowe na dole; cała grafika rysowana proceduralnie w kodzie) (Node.js + Express + Socket.IO, klient na canvasie, bez kroku budowania).
+# Arcade Office – publiczna tablica paper desku
+Wirtualne biuro i tablice desku (Node.js + Express + Socket.IO, bez kroku budowania). Scena jest zaprojektowana w 3840×2160 i skaluje się do okna (1080p, 720p). Biuro jest mniejsze i gęstsze; duże tablice to split-flap (odwracane płytki). Czcionki: Barlow Condensed i Chakra Petch plus stos Noto (w tym Noto Color Emoji, CJK, arabski, hebrajski, dewanagari) – nazwy tokenów z polskimi znakami, emoji i CJK nie wypadają w tofu.
+
+## Tablice
+- **Skaner** – jeden token naraz (nie lista). Odrzuty pierwszego sita (`cheap_reject` / `CHP-`) nie wchodzą. Rotacja co 10 s po aktualnej paczce; nowy skan zaczyna od początku. Obok płytki: wykres 1h. Wskaźniki z feedu, a gdy da się je dociągnąć: zmiana 5m/1h/6h/24h, płynność, wolumen, mcap/FDV, kupno/sprzedaż, wiek pary, holderzy.
+- **Pozycje** i **portfel** – split-flap. Przy nowej treści wszystkie płytki migoczą, potem wiersze siadają od góry co ok. 3 s. Skaner siada trzema pasami (nazwa, cena, wskaźniki), żeby zdążyć przed kolejnym tokenem.
+- Wejście głębiej w pipeline (SCAN → VET → BOOK → kupno FILLS) daje mocniejszy efekt i dźwięk; kupno jest najgłośniejsze. Zamknięcie na minus ma osobny dźwięk, a zysk – dźwięk etapu RISK od szczytu PnL: (0,10]=0, (10,25]=I, (25,50]=II, (50,100]=III, >100=IV. Dźwięk jest z WebAudio (bez plików). Autoplay jest zablokowany do kliknięcia **WŁĄCZ DŹWIĘK**, jest też wyciszenie.
+- Czat publiczny: linia CHIEF/sędziego to samo `wybor: TOKEN`, bez confidence / worth / score.
+
+`GET /api/scan` → `{serverNow, rotateMs, cycleMs, index, total, tokens[], prev, lastFeedAt}`. Token niesie pola feedu oraz, gdy zdążą przyjść, `change5m/1h/6h/24h`, `volume*`, `fdv`, `buys*`/`sells*`, `pairCreatedAt`, `chart` (OHLCV 1h), `holders`, `holdersTop10`, `sources`. Socket.IO: `scan` (stan tablicy), `deskFx` (`stage` 1–4, `close` ze `stage` -1..4, `sell`, `risk`). Dołączenie `{spectate:true}` ogląda biuro bez avatara.
+
+Wykres i holderzy: serwer pyta DexScreener (paczka adresów) i GeckoTerminal (maks. 8 zapytań/min, cache). Adres mintu musi być w `top10[].address` (jest na boardzie desku; `deskItems` go przepuszcza).
+
+Czego feed sam nie ma, więc bez API widać kreskę: zmiana 5m/6h/24h, wolumen, FDV, buy/sell, wiek, holderzy, świece. Pozycje nie mają adresu mintu, więc wykres trzymanego tokenu jest tylko wtedy, gdy ten sam mint jest w skanie. Szczyt PnL nie przychodzi z feedu: serwer liczy go z ceny, dopóki żyje, i podbija go linią RISK `Pilnuje TOKEN: Stage N`. Po restarcie szczyt jest niepełny, aż przyjdzie kolejna linia albo cena. `pct` zamknięcia to wynik wyjścia, nie szczyt. `sync-feed.js` na boksie musi być z tego repo, żeby przestał obcinać znaki spoza ASCII; sam Render tego nie uruchamia.
 
 ## Strefy
 - **Open Space** – główna sala, w której pracują boty: biurka SIZE (kalkulator, waga, 3 monitory), SCAN (radar, ekrany z wykresami), BOOK (księgi, segregatory, szafa na akta), RISK (lampa alarmowa, tarcza, wskaźnik), VET (lupa, lista kontrolna, pieczątka), FILLS (terminal, drukarka biletów, dzwonek).
@@ -24,9 +36,11 @@ Boty są sterowane przez serwer (`bots.js`): maszyna stanów + A* po siatce kafe
 Sterowanie: strzałki / WASD – ruch, Enter – czat, Esc – powrót do gry. Zakładka „Globalny” – wszyscy, „Strefa” – tylko osoby w Twojej strefie.
 
 ## Pliki
-- `server.js` – Express + Socket.IO, walidacja ruchu po stronie serwera (kolizje, anty-teleport), czat globalny/strefowy, `/health`
-- `public/map.js` – wspólna mapa (strefy, ściany, meble)
-- `public/index.html`, `public/game.js` – klient: logowanie, proceduralne sprite’y, rendering, czat
+- `server.js` – Express + Socket.IO, ruch, czat, feed, `/health`
+- `scan.js` – rotacja skanu, DexScreener, GeckoTerminal (limit 8/min)
+- `deskfx.js` – efekty etapów i zamknięć oraz obcięcie wiersza sędziego do `wybor: TOKEN`
+- `public/map.js` – mapa biura
+- `public/index.html`, `public/game.js`, `public/flap.js`, `public/office.js`, `public/audio.js` – scena, split-flap, biuro, dźwięk
 - `render.yaml` – konfiguracja Render (Blueprint)
 - `test.js`, `screenshot.js` – skrypty weryfikacyjne
 

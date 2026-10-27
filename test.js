@@ -6,17 +6,26 @@ a.emit('join',{name:'Alicja',color:'#00f0ff',sprite:1});await wait(200);b.emit('
 chk(got.a.some(([e,d])=>e=='playerJoined'&&d.name=='Bartek'),'A widzi dołączenie B');
 const M0=require('./public/map.js');const init=got.a.find(([e])=>e=='init')[1];const bots=Object.values(init.players).filter(p=>p.bot);
 chk(bots.length==7&&['CHIEF','SIZE','SCAN','BOOK','RISK','VET','FILLS'].every(n=>bots.some(b=>b.name==n)),'init zawiera 7 botów NPC oznaczonych bot:true');
-chk(M0.zoneAt(15*16,6*16)=='board','Strefa Tablica Pozycji (board) w Open Space');{const bl=await fetch(U+'/api/bots').then(r=>r.json());const hz=b=>M0.zoneAt(b.home[0]*16+8,b.home[1]*16+8);chk(bl.length==7&&hz(bl.find(b=>b.name=='CHIEF'))=='chief'&&bl.filter(b=>hz(b)=='open').length==6,'Biurka: CHIEF w gabinecie, 6 botów w Open Space (/api/bots)');}
-const M=require('./public/map.js');chk(M.zoneAt(14*16,13*16)=='open'&&M.zoneAt(5*16,25*16)=='chief'&&M.zoneAt(31*16,24*16)=='bathroom'&&M.zoneAt(15*16,23*16)=='social'&&M.ZONES.length==6&&!M.ZONES.some(z=>['trading','meeting','lounge','moon','bots'].includes(z.id)),'Nowe strefy (Open Space, Gabinet CHIEF, Łazienka, Social, Tablica, Top 10) rozpoznawane');
-a.emit('move',{x:240,y:216,dir:'right'});await wait(200);
-chk(got.b.some(([e,d])=>e=='playerMoved'&&d.id==a.id&&d.x==240),'B dostaje ruch A');
+chk(M0.zoneAt(18*16,2*16+8)=='board','Strefa Tablica Pozycji (board) w Open Space');{const bl=await fetch(U+'/api/bots').then(r=>r.json());const hz=b=>M0.zoneAt(b.home[0]*16+8,b.home[1]*16+8);chk(bl.length==7&&hz(bl.find(b=>b.name=='CHIEF'))=='chief'&&bl.filter(b=>hz(b)=='open').length==6,'Biurka: CHIEF w gabinecie, 6 botów w Open Space (/api/bots)');}
+const M=require('./public/map.js');chk(M.zoneAt(22*16,6*16)=='open'&&M.zoneAt(5*16,14*16)=='chief'&&M.zoneAt(31*16,14*16)=='bathroom'&&M.zoneAt(15*16,14*16)=='social'&&M.ZONES.length==6&&!M.ZONES.some(z=>['trading','meeting','lounge','moon','bots'].includes(z.id)),'Nowe strefy (Open Space, Gabinet CHIEF, Łazienka, Social, Tablica, Top 10) rozpoznawane');
+const sx=M.SPAWN.x,sy=M.SPAWN.y;
+a.emit('move',{x:sx+4,y:sy,dir:'right'});await wait(200);
+chk(got.b.some(([e,d])=>e=='playerMoved'&&d.id==a.id&&d.x==sx+4),'B dostaje ruch A');
 a.emit('move',{x:900,y:300});await wait(200);chk(got.a.some(([e])=>e=='correct'),'Serwer odrzuca teleport');
 a.emit('chat',{text:'gm 🚀',scope:'global'});await wait(200);chk(got.b.some(([e,d])=>e=='chat'&&d.text=='gm 🚀'&&d.scope=='global'),'Czat globalny dociera do B');
-for(let y=216;y>=104;y-=8){a.emit('move',{x:240,y,dir:'up'});await wait(25);}await wait(100);
+function walkable(x,y){return y>=0&&x>=0&&y<M.H&&x<M.W&&M.solid[y][x]===0&&!M.blocked(x*16+8,y*16+8);}
+function pathTo(from,to){const k=(x,y)=>y*M.W+x,prev=new Map([[k(...from),null]]),q=[from];
+ while(q.length){const [x,y]=q.shift();if(x==to[0]&&y==to[1])break;for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(walkable(nx,ny)&&!prev.has(k(nx,ny))){prev.set(k(nx,ny),[x,y]);q.push([nx,ny]);}}}
+ if(!prev.has(k(...to)))return null;const out=[];let c=to;while(c){out.unshift(c);c=prev.get(k(...c));}return out;}
+let goal=null;for(let y=0;y<M.H&&!goal;y++)for(let x=0;x<M.W;x++)if(M.zoneAt(x*16+8,y*16+8)=='board'&&walkable(x,y)){goal=[x,y];break;}
+const pth=pathTo([Math.floor(sx/16),Math.floor(sy/16)],goal);
+let cx=sx+4,cy=sy;
+for(const [tx,ty] of pth){const X=tx*16+8,Y=ty*16+8;while(Math.hypot(X-cx,Y-cy)>0.5){const d=Math.hypot(X-cx,Y-cy),step=Math.min(8,d);cx+=(X-cx)/d*step;cy+=(Y-cy)/d*step;a.emit('move',{x:Math.round(cx*10)/10,y:Math.round(cy*10)/10,dir:'up'});await wait(12);}}
+await wait(100);
 a.emit('chat',{text:'tajne',scope:'zone'});await wait(200);
 chk(got.a.some(([e,d])=>e=='chat'&&d.text=='tajne'&&d.zone=='board'),'A dostaje własną wiadomość strefową (Tablica Pozycji)');
 chk(!got.b.some(([e,d])=>e=='chat'&&d.text=='tajne'),'B (inna strefa) NIE dostaje wiadomości strefowej');
-await wait(4300);chk(got.a.some(([e,d])=>e=='bubble'&&String(d.id).startsWith('bot-')&&d.text),'Boty wysyłają dymki statusu');
+await wait(13000);chk(got.a.some(([e,d])=>e=='bubble'&&String(d.id).startsWith('bot-')&&d.text),'Boty wysyłają dymki statusu');
 // ---- API Tablicy Pozycji ----
 const TOK=process.env.BOT_API_TOKEN||require('fs').readFileSync(__dirname+'/.bot-token','utf8').trim();
 const api=(m,u,body,tok=TOK)=>fetch(U+u,{method:m,headers:{'content-type':'application/json',...(tok?{authorization:'Bearer '+tok}:{})},body:body?JSON.stringify(body):undefined}).then(async r=>({s:r.status,j:await r.json().catch(()=>null)}));
@@ -74,8 +83,14 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  await wait(5500);chk(fev.some(([e,d])=>e=='chat'&&d.system&&/SCAN: Skan: 200/.test(d.text))&&fev.some(([e,d])=>e=='bubble'&&d.id=='bot-VET'&&d.text=='Odrzucam X'),'Aktywność -> czat + dymki botów');
  fr=await fp({positions:[],activity:[...A,{ts:'2026-10-15T19:05:00+02:00',bot:'BOOK',text:'Wybieram Y',kind:'pick'}]});
  chk(fr.s==200&&fr.j.closed.length==1&&fr.j.activity==1,'Feed: brakująca pozycja zamknięta, nowa aktywność');await wait(300);
- chk(fev.some(([e,d])=>e=='positionClosed'&&d=='feed-T-1')&&fev.some(([e,d])=>e=='bubble'&&d.id=='bot-RISK'&&/Zamykam TFEED \(PAPIER\)/.test(d.text)),'Zamknięcie ogłoszone (PAPIER)');
+ chk(fev.some(([e,d])=>e=='positionClosed'&&d=='feed-T-1')&&fev.some(([e,d])=>e=='bubble'&&d.id=='bot-RISK'&&/Zamykam TFEED/.test(d.text)),'Zamknięcie ogłoszone');
  const gf=await fetch(F).then(r=>r.json());chk(gf.lastFeedAt&&gf.activity.length==3&&gf.positions.length==0,'GET /api/feed');
+ fr=await fp({positions:[],activity:[],top10:[{ticker:'AAA',chain:'solana',priceUSD:1,marketCap:10,liquidity:5,change_1h:1.5,stage:'soft_pass',reason:'soft pass'},{ticker:'BBB',chain:'solana',priceUSD:1,marketCap:10,liquidity:5,change_1h:-1,stage:'cheap_reject',reason:'cheap'}],top10_rule:'test',top10_cycle_ts:'2026-10-27T12:00:00Z'});
+ const sc=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
+ chk(sc.total===1&&sc.tokens&&sc.tokens[0].symbol==='AAA'&&!sc.tokens.some(t=>String(t.symbol).toUpperCase()==='BBB'),'Skan: cheap_reject (CHP-) nie wchodzi na tablicę');
+ fr=await fp({positions:[{id:'U-1',bot:'RISK',symbol:'Łódź',chain:'solana',side:'LONG',size:10,entry:1,price:1.1,mode:'SHADOW'}],activity:[]});
+ fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
+ chk(fl.some(p=>p.symbol==='Łódź'),'Symbol z polskimi znakami zostaje na tablicy');
  fc.disconnect();}finally{srv.kill();}
-chk(require('./public/map.js').zoneAt(6*16,6.5*16)=='top10','Strefa Top 10 Krypto przy tablicy');
+chk(require('./public/map.js').zoneAt(4*16,2*16+8)=='top10','Strefa Top 10 Krypto przy tablicy');
 b.disconnect();await wait(200);chk(got.a.some(([e])=>e=='playerLeft'),'A widzi wyjście B');a.disconnect();process.exit(ok?0:1);})();

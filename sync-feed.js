@@ -52,10 +52,10 @@ async function refreshNews(){if(/worldmonitor\.app/i.test(WM_URL))return null;if
   all.sort((a,b)=>b.score-a.score||(b.publishedAt||0)-(a.publishedAt||0));const items=all.slice(0,15).map(({score,...x})=>x);if(!items.length)throw new Error('pusta lista');
   newsCache={items,updatedAt:new Date().toISOString(),source:'worldmonitor-local'};}
  catch(e){log('news: '+e.message+' (zostawiam poprzednie)');}return newsCache;}
-// ---- botEvents: each bot's last 10 REAL events (ledger + logs + trades.jsonl) as short Polish ASCII lines. Only whitelisted fields; no addresses/keys ----
-const ASC=x=>String(x??'').replace(/ł/g,'l').replace(/Ł/g,'L').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'').replace(/\s+/g,' ').trim();
-const TK=x=>ASC(x).split(' ')[0].slice(0,14);
-const SYM=(tok,chain,addr)=>{let s=String(tok||'').toUpperCase().replace(/[^A-Z0-9_.-]/g,'').slice(0,20);if(s)return s;const a=String(addr||'').replace(/[^A-Za-z0-9]/g,'');const c=String(chain||'TOK').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,3)||'TOK';return (c+(a.slice(-6)||'X')).slice(0,20);};
+// ---- botEvents: each bot's last 10 REAL events. Unicode names stay (the board fonts cover them). No addresses or keys. ----
+const ASC=x=>String(x??'').replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').replace(/\s+/g,' ').trim();
+const TK=x=>[...ASC(x).split(' ')[0]].slice(0,14).join('');
+const SYM=(tok,chain,addr)=>{let s=[...String(tok||'').replace(/[<>]/g,'')].slice(0,24).join('');if(s)return s;const a=String(addr||'').replace(/[^A-Za-z0-9]/g,'');const c=String(chain||'TOK').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,3)||'TOK';return (c+(a.slice(-6)||'X')).slice(0,20);};
 const REASON=r=>{r=ASC(r);if(/momentum_already_spent/.test(r))return 'juz wycenione';if(/shape crowd/.test(r))return 'slaby tlum';if(/position already open/.test(r))return 'pozycja juz otwarta';if(/single survivor/.test(r))return 'tylko jeden kandydat';
  if(/0 survivors/.test(r))return '0 kandydatow po VET';return r.replace(/0x[0-9a-fA-F]{6,}|[1-9A-HJ-NP-Za-km-z]{30,}/g,'').slice(0,28);};
 const BOTS7=['SCAN','VET','BOOK','SIZE','FILLS','RISK','CHIEF'];
