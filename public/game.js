@@ -130,11 +130,48 @@ function heldSet(){
   return s;
 }
 function heldHit(open, tok){return nameKeys(tok).some(k=>open.has(k));}
+function stageFromPeak(pct){
+  const n=+pct;
+  if(!Number.isFinite(n)||n<=10) return 0;
+  if(n<=25) return 1;
+  if(n<=50) return 2;
+  if(n<=100) return 3;
+  return 4;
+}
+function positionMatchesToken(p, token){
+  const keys=new Set(nameKeys(token));
+  if(!keys.size||!p) return false;
+  return [].concat(nameKeys(p.symbol), nameKeys(p.displaySymbol)).some(k=>keys.has(k));
+}
+function orderPeak(p){
+  if(p&&p.peakPct!=null&&Number.isFinite(+p.peakPct)) return +p.peakPct;
+  return null;
+}
+// Badge is this open order only (id), never the token's previous trades.
 function stageOf(p){
-  let st=null;
-  for(const k of [].concat(nameKeys(p&&p.symbol), nameKeys(p&&p.displaySymbol))) if(k&&riskBadge[k]!=null&&(st==null||riskBadge[k]>st)) st=riskBadge[k];
-  if(p&&p.peak>0){const from=p.peak<=10?0:p.peak<=25?1:p.peak<=50?2:p.peak<=100?3:4; if(st==null||from>st) st=from;}
+  if(!p) return 0;
+  let st=stageFromPeak(orderPeak(p));
+  const b=riskBadge[p.id];
+  if(b&&b.stage>st&&!(p.openedAt&&b.ts&&b.ts<p.openedAt)) st=b.stage;
   return st;
+}
+function forgetStage(id){if(id) delete riskBadge[id];}
+function pruneStages(){
+  const live=new Set(Object.keys(positions));
+  for(const id of Object.keys(riskBadge)){
+    if(!live.has(id)){delete riskBadge[id]; continue;}
+    const p=positions[id], b=riskBadge[id];
+    if(p&&b&&p.openedAt&&b.ts&&b.ts<p.openedAt) delete riskBadge[id];
+  }
+}
+function noteRisk(token, stage, ts){
+  const t=ts||Date.now(), st=stage|0;
+  for(const p of Object.values(positions)){
+    if(!positionMatchesToken(p, token)) continue;
+    if(p.openedAt&&t<p.openedAt) continue;
+    const prev=riskBadge[p.id];
+    if(!prev||st>prev.stage) riskBadge[p.id]={stage:st, ts:t};
+  }
 }
 function heldDisplay(tok){
   if(!tok) return '';
@@ -296,6 +333,16 @@ function syncPos(force){
   const ids=new Set(all.map(p=>p.id));
   const structural=!posSnap||posOrder.length!==all.length||posOrder.some(id=>!ids.has(id))||all.some(p=>posOrder.indexOf(p.id)<0);
   const due=!posCommitAt||now-posCommitAt>=POSITIONS_REFRESH_MS;
+  if(!structural&&!due&&!force&&posSnap){
+    let stageChanged=false;
+    for(const s of posSnap){
+      const p=positions[s.id];
+      if(!p) continue;
+      const st=stageOf(p);
+      if(st!==s.st){s.st=st; stageChanged=true;}
+    }
+    if(stageChanged) posVis='';
+  }
   if(structural||due||force||!posSnap){
     const ranked=all.map(snapPos).sort((a,b)=>(b.openedAt||0)-(a.openedAt||0)||String(a.id).localeCompare(String(b.id)));
     posOrder=ranked.map(p=>p.id);
@@ -492,7 +539,7 @@ function onFx(ev){
     showToast('SPRZEDAŻ '+(ev.frac||'')+'  ·  '+(ev.token||''), CYAN, 1800);
     burst(posC[0], posC[1], CYAN, 16, 260, 0.8, 180);
   }else if(ev.kind==='risk'){
-    if(ev.token) for(const k of nameKeys(ev.token)) if(k&&(riskBadge[k]==null||ev.stage>riskBadge[k])) riskBadge[k]=ev.stage;
+    if(ev.token) noteRisk(ev.token, ev.stage, ev.ts);
   }
   if(!audio.isMuted()) audioBtn.classList.add('hit');
   setTimeout(()=>audioBtn.classList.remove('hit'), 360);
@@ -764,11 +811,11 @@ function takePositions(list){
   if(!Array.isArray(list)) return;
   positions={};
   for(const p of list) if(p&&p.id) positions[p.id]=p;
-  notePeaks(); feedAt=Date.now(); tableSig=''; renderTable();
+  pruneStages(); notePeaks(); feedAt=Date.now(); tableSig=''; renderTable();
 }
 socket.on('positions', takePositions);
-socket.on('position', p=>{if(!p||!p.id) return; positions[p.id]=p; notePeaks(); feedAt=Date.now(); tableSig=''; renderTable();});
-socket.on('positionClosed', id=>{delete positions[id]; tableSig=''; renderTable();});
+socket.on('position', p=>{if(!p||!p.id) return; positions[p.id]=p; pruneStages(); notePeaks(); feedAt=Date.now(); tableSig=''; renderTable();});
+socket.on('positionClosed', id=>{delete positions[id]; forgetStage(id); tableSig=''; renderTable();});
 socket.on('portfolio', d=>{if(d&&typeof d==='object'&&!d.empty){portfolio=d; feedAt=Date.now();}});
 socket.on('ticker', d=>{if(d&&typeof d==='object') ticker=d;});
 socket.on('top10', d=>{if(d&&Array.isArray(d.items)){top10=d; renderTop10();}});
@@ -776,13 +823,7 @@ socket.on('scan', d=>{if(d&&typeof d==='object'){scan=d; if(d.lastFeedAt) feedAt
 socket.on('deskFx', onFx);
 socket.on('posEvents', renderPosEvents);
 socket.on('printer', d=>{if(d&&Number.isFinite(+d.pile)) printerPile=+d.pile;});
-function notePeaks(){
-  for(const p of Object.values(positions)){
-    if(!(p.peak>0)) continue;
-    const st=p.peak<=10?0:p.peak<=25?1:p.peak<=50?2:p.peak<=100?3:4;
-    for(const k of [].concat(nameKeys(p.symbol), nameKeys(p.displaySymbol))) if(k&&(riskBadge[k]==null||st>riskBadge[k])) riskBadge[k]=st;
-  }
-}
+function notePeaks(){pruneStages();}
 // ---- input ----
 addEventListener('keydown', e=>{
   const tag=document.activeElement&&document.activeElement.tagName;
