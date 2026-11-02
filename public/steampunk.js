@@ -116,7 +116,10 @@ function passHtml(pass){
 
 function renderPosPlaques(posSnap, pnlOf, stageOf, showName){
   const grid=$('posPlaqueGrid');
+  const emptyEl=$('posEmptyMsg');
   if(!grid) return;
+  const filled=posSnap&&posSnap.length;
+  if(emptyEl) emptyEl.style.display=filled?'none':'block';
   const rows=[];
   for(let i=0;i<POS_LIMIT;i++){
     const p=posSnap&&posSnap[i];
@@ -176,7 +179,8 @@ function updateGauges(state){
   setGauge('gaugeWin', 0, 100, wr, wr==null?'—':(Math.round(wr)+'%'));
 }
 
-function tickChrome(now, state){
+function tickChrome(_rafMs, state){
+  const now=Date.now();
   paintAnalogClock($('analogClock'), now);
   paintDigital($('digitalClock'), now);
   updateGauges(state);

@@ -774,8 +774,8 @@ function tickMarquee(id, speed, t){
   const w=track.scrollWidth/2; if(w<10) return;
   track.style.transform='translateX('+(-((t/1000*speed)%w))+'px)';
 }
-function paintChrome(now){
-  if(window.AO_STEAMPUNK) AO_STEAMPUNK.tick(now, gaugeState());
+function paintChrome(){
+  if(window.AO_STEAMPUNK) AO_STEAMPUNK.tick(Date.now(), gaugeState());
   else{
     try{clock.textContent=new Date().toLocaleTimeString('pl-PL',{timeZone:'Europe/Warsaw',hour:'2-digit',minute:'2-digit',second:'2-digit'})+'  WAW';}catch(e){clock.textContent=new Date().toLocaleTimeString();}
   }
@@ -943,7 +943,42 @@ async function loadHistory(){
   histLoaded=true;
   chatQueue.splice(0).forEach(pushChat);
 }
-loadHistory();
+function applyDemoFeed(){
+  if(!/\bdemo=1\b/.test(location.search)) return;
+  const now=Date.now();
+  feedAt=now-12;
+  portfolio={start:500,bank:487.32,realizedPnl:-12.68,roiPct:-2.5,trades:14,wins:9,losses:5,winRate:64,maxDrawdownPct:8.2,mode:'SHADOW',updatedAt:new Date(now).toISOString(),
+    series:[{ts:now-86400000*3,bank:520},{ts:now-86400000*2,bank:505},{ts:now-86400000,bank:492},{ts:now,bank:487.32}],
+    best:{token:'CZ',displaySymbol:'CZ',net:41.2,pct:38},worst:{token:'MOG',displaySymbol:'MOG',net:-18.4,pct:-22}};
+  const defs=[
+    {sym:'CZ',disp:'CZ',pnl:18.4,h1:12.1,h6:42,m:2.1e6,pass:{n:3,wins:2,losses:1},st:2},
+    {sym:'WIF',disp:'WIF',pnl:-4.2,h1:-2.1,h6:8.5,m:890e6,pass:{n:1,wins:0,losses:1},st:1},
+    {sym:'BONK',disp:'BONK',pnl:6.8,h1:4.2,h6:15.2,m:1.4e9,pass:{n:2,wins:1,losses:1},st:0},
+    {sym:'PEPE',disp:'PEPE',pnl:22.1,h1:18,h6:55,m:3.2e9,pass:{n:4,wins:3,losses:1},st:3},
+    {sym:'MOG',disp:'MOG',pnl:-11.3,h1:-8.4,h6:-12,m:45e6,pass:{n:0,wins:0,losses:0},st:0}
+  ];
+  positions={};
+  defs.forEach((d,i)=>{
+    const entry=0.001*(i+1), price=entry*(1+d.pnl/100);
+    positions['demo-'+i]={id:'demo-'+i,symbol:d.sym,displaySymbol:d.disp,side:'LONG',bot:'RISK',size:120,entry,price,pnlBase:entry,
+      h1:d.h1,h6:d.h6,mcap:d.m,pass:d.pass,tiers:1,openedAt:now-(i+1)*600000,st:d.st};
+  });
+  posEventsCache=[
+    {ts:now-3600000,action:'OPEN',token:'CZ',displaySymbol:'CZ',usd:120,price:0.00034,pct:null,net:null},
+    {ts:now-1800000,action:'CLOSE',token:'OLD',displaySymbol:'OLD',usd:80,price:0.002,pct:12.5,net:8.4},
+    {ts:now-900000,action:'OPEN',token:'PEPE',displaySymbol:'PEPE',usd:100,price:0.000008,pct:null,net:null},
+    {ts:now-300000,action:'CLOSE',token:'FAIL',displaySymbol:'FAIL',usd:60,price:0.001,pct:-9.2,net:-5.1}
+  ];
+  scan={total:6,index:0,rev:1,tokens:[
+    {symbol:'CZ',price:0.00034,change1h:185,stage:'soft_pass',reason:'demo'},
+    {symbol:'A',stage:'vet.reject'},{symbol:'B',stage:'hard_pass'},{symbol:'C',stage:'picked'},{symbol:'D',stage:'order'},{symbol:'E',stage:'filled'}
+  ]};
+  tableSig=''; posVis=''; portVis='';
+  syncPos(true); syncPort(true); renderPosEvents(posEventsCache);
+  paintScan(currentToken(), true);
+}
+loadHistory().then(applyDemoFeed);
+applyDemoFeed();
 if(document.fonts){
   document.fonts.ready.then(()=>FLAP.clearCache());
   document.fonts.addEventListener&&document.fonts.addEventListener('loadingdone', ()=>FLAP.clearCache());
@@ -962,7 +997,7 @@ function frame(t){
   drawBank($('portChart'), portDraw||portfolio);
   nameFlap.frame(t); priceFlap.frame(t); statFlap.frame(t); portFlap.frame(t);
   office.frame(t, {players, me, printerPile, bubbles, hud:hud()});
-  drawFx(t); paintChrome(t);
+  drawFx(t); paintChrome();
   const p=players[me];
   if(p){
     const z=zoneAt(p.x,p.y);
