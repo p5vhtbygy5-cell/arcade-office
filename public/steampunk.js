@@ -117,6 +117,10 @@ function passHtml(pass){
 }
 
 function renderPosPlaques(posSnap, pnlOf, stageOf, showName){
+  const head=$('posHead');
+  if(head){
+    head.innerHTML=COLS.map(c=>'<div class="pl-cell pl-ivory">'+c+'</div>').join('');
+  }
   const grid=$('posPlaqueGrid');
   const emptyEl=$('posEmptyMsg');
   if(!grid) return;

@@ -23,17 +23,27 @@ html,body{margin:0;height:100%;background:#0a0806;color:var(--ink);font-family:v
  radial-gradient(ellipse 80% 60% at 10% 100%,rgba(184,115,51,.12),transparent 50%),
  linear-gradient(168deg,#120e0a 0%,#1a120c 35%,#0d0a08 100%)}
 #stage{position:absolute;left:0;top:0;width:3840px;height:2160px;transform-origin:0 0;
- display:grid;grid-template-columns:1580px 1fr 1fr;grid-template-rows:188px minmax(0,0.52fr) minmax(0,1.55fr) 400px 64px 64px;gap:18px;padding:18px;
+ display:grid;grid-template-columns:1580px 1fr 1fr;grid-template-rows:188px minmax(520px,0.72fr) minmax(0,1.38fr) 400px 64px 64px;gap:22px;padding:18px;
  background:
   repeating-linear-gradient(92deg,rgba(0,0,0,.04) 0 2px,transparent 2px 48px),
   repeating-linear-gradient(0deg,rgba(255,240,210,.02) 0 1px,transparent 1px 36px),
   linear-gradient(165deg,#221810 0%,#14100c 42%,#0f0c09 100%)}
 #stage:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.12;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E")}
-#stage .stagePipe{position:absolute;pointer-events:none;z-index:0;background:linear-gradient(90deg,#5a3a18,#c9a227 40%,#b87333 60%,#5a3a18);box-shadow:inset 0 1px 0 rgba(255,240,210,.25),0 2px 8px rgba(0,0,0,.4);border-radius:999px}
-#stage .sp-h1{left:1592px;top:220px;width:14px;height:420px;border-radius:8px;background:linear-gradient(180deg,#5a3010,#e8c86a 30%,#b87333 70%,#5a3010);box-shadow:inset 2px 0 0 rgba(255,240,200,.35),inset -2px 0 0 rgba(0,0,0,.35)}
-#stage .sp-h1:after,#stage .sp-v2:after{content:"";position:absolute;left:-6px;top:40%;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#f0d890,#8a5a20);border:2px solid #3a2810}
-#stage .sp-h2{left:40px;right:40px;height:12px;top:48%;border-radius:8px;background:linear-gradient(180deg,#8a5a20,#e0b85a,#6a4018);box-shadow:inset 0 2px 0 rgba(255,240,200,.3)}
-#stage .sp-v2{right:32%;top:220px;width:14px;height:420px;border-radius:8px;background:linear-gradient(180deg,#5a3010,#c9a227,#b87333);opacity:.9}
+#stage .stagePipe{position:absolute;pointer-events:none;z-index:5;border-radius:9px}
+#stage .sp-v1{left:1598px;top:214px;width:24px;height:554px;background:linear-gradient(90deg,#5a3010,#f0d890 32%,#b87333 68%,#4a2808);box-shadow:inset 3px 0 0 rgba(255,240,200,.5),inset -3px 0 0 rgba(0,0,0,.5),0 0 14px rgba(184,115,51,.4)}
+#stage .sp-v3{left:2710px;top:1568px;width:24px;height:404px;background:linear-gradient(90deg,#5a3010,#e8c86a 35%,#b87333 72%,#4a2808);box-shadow:inset 3px 0 0 rgba(255,240,200,.45),inset -3px 0 0 rgba(0,0,0,.45)}
+#stage .sp-hTop{left:28px;right:28px;height:18px;top:209px;background:linear-gradient(180deg,#8a5a20,#f0d890 42%,#b87333 72%,#5a3010);box-shadow:inset 0 3px 0 rgba(255,240,200,.45),inset 0 -3px 0 rgba(0,0,0,.4)}
+#stage .sp-hMid{left:28px;right:28px;height:20px;top:750px;background:linear-gradient(180deg,#8a5a20,#f0d890 45%,#b87333 70%,#5a3010);box-shadow:inset 0 3px 0 rgba(255,240,200,.45),inset 0 -3px 0 rgba(0,0,0,.4)}
+#stage .sp-hLow{left:28px;right:28px;height:20px;top:1549px;background:linear-gradient(180deg,#8a5a20,#e8c86a 45%,#b87333 70%,#5a3010);box-shadow:inset 0 3px 0 rgba(255,240,200,.4),inset 0 -3px 0 rgba(0,0,0,.4)}
+#stage .pipeJoint{position:absolute;z-index:6;pointer-events:none;width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#fff1c4,#c9a227 42%,#5a3010);border:3px solid #3a2410;box-shadow:inset 0 2px 2px rgba(255,255,255,.4),0 2px 6px rgba(0,0,0,.55)}
+#stage .pj1{left:1591px;top:202px}
+#stage .pj2{left:1591px;top:741px}
+#stage .pj3{left:2703px;top:741px}
+#stage .pj4{left:1591px;top:1541px}
+#stage .pj5{left:2703px;top:1541px}
+#stage .pj6{left:2703px;top:1952px}
+#stage .pj7{left:40px;top:741px}
+#stage .pj8{left:3760px;top:741px}
 #stage>*{min-width:0;min-height:0}
 #top{grid-column:1/-1;grid-row:1;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;padding:0 8px;position:relative}
 #top .brand{justify-self:start}
@@ -45,10 +55,14 @@ html,body{margin:0;height:100%;background:#0a0806;color:var(--ink);font-family:v
 #feedAge{font-size:22px;color:var(--good);letter-spacing:.06em;margin-top:6px}
 .clockFace{width:168px;height:168px;filter:drop-shadow(0 6px 16px rgba(0,0,0,.5))}
 #digitalClock{font-variant-numeric:tabular-nums;font-size:46px;font-weight:700;color:var(--amber);letter-spacing:.14em;text-shadow:0 0 24px rgba(232,184,74,.45);padding:4px 16px;border:1px solid rgba(201,162,39,.35);border-radius:6px;background:linear-gradient(180deg,rgba(20,16,10,.9),rgba(8,6,4,.95));display:inline-block;margin-top:4px}
-.gearDeco{position:absolute;width:92px;height:92px;opacity:.9;pointer-events:none;animation:spin 36s linear infinite;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
-.gearDeco.g1{top:4px;left:380px}
-.gearDeco.g2{top:8px;right:420px;animation-direction:reverse;animation-duration:36s}
-.gearDeco.g3{top:6px;left:50%;margin-left:-140px;width:44px;height:44px;opacity:.35}
+.gearDeco{position:absolute;width:156px;height:156px;opacity:.97;pointer-events:none;animation:spin 28s linear infinite;filter:drop-shadow(0 4px 8px rgba(0,0,0,.6));z-index:4}
+.gearDeco.g1{top:-18px;left:300px}
+.gearDeco.g2{top:-14px;right:320px;animation-direction:reverse;animation-duration:22s}
+.gearDeco.g3{top:8px;left:50%;margin-left:-228px;width:112px;height:112px}
+.gearDeco.g4{top:14px;left:50%;margin-left:118px;width:100px;height:100px;animation-direction:reverse;animation-duration:34s}
+.gearDeco.g5{top:42px;left:168px;width:72px;height:72px;animation-duration:18s}
+.gearDeco.g6{top:48px;right:188px;width:68px;height:68px;animation-direction:reverse;animation-duration:16s}
+.panel .cornerGear{position:absolute;width:128px;height:128px;opacity:.94;pointer-events:none;z-index:3;animation:spin 32s linear infinite;filter:drop-shadow(0 3px 5px rgba(0,0,0,.55))}
 .panel{position:relative;display:flex;flex-direction:column;overflow:hidden;border-radius:14px;border:5px solid transparent;
  background:
   radial-gradient(circle at 16px 16px,#f0d890 0 5px,#5a3810 6px,transparent 7px) padding-box,
@@ -61,9 +75,9 @@ html,body{margin:0;height:100%;background:#0a0806;color:var(--ink);font-family:v
 .panel:before,.panel:after{content:"";position:absolute;width:18px;height:18px;pointer-events:none;z-index:4;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff1c4,#c9a227 40%,#5a3810 72%);box-shadow:inset 0 1px 2px rgba(0,0,0,.55),0 0 0 2px #3a2810}
 .panel:before{top:10px;left:10px}
 .panel:after{right:10px;bottom:10px}
-.panel .cornerGear{position:absolute;width:72px;height:72px;opacity:.85;pointer-events:none;z-index:2;animation:spin 40s linear infinite}
-.panel .cornerGear.tr{top:4px;right:44px}
-.panel .cornerGear.bl{bottom:4px;left:44px;transform:scaleX(-1)}
+.panel .cornerGear.tr{top:6px;right:28px}
+.panel .cornerGear.bl{bottom:6px;left:28px}
+.panel .cornerGear.sm{width:88px;height:88px}
 .officeView{position:relative;flex:1;min-height:0;background:linear-gradient(180deg,#1a120c,#0f0c09);overflow:hidden}
 .officeView:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.25;background:repeating-linear-gradient(90deg,rgba(90,60,30,.15) 0 24px,rgba(60,40,22,.12) 24px 48px)}
 #officeWrap .officeGauge{position:absolute;right:18px;bottom:14px;z-index:4;width:130px}
@@ -124,8 +138,8 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
 #posPlaque{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;width:100%}
 :root{--pos-cols:minmax(0,2.4fr) minmax(0,.7fr) minmax(0,.9fr) minmax(0,.85fr) minmax(0,.85fr) minmax(0,1fr) minmax(0,.95fr) minmax(0,.55fr)}
 .pl-head,.pl-row{display:grid;width:100%;grid-template-columns:var(--pos-cols);gap:6px;align-items:stretch}
-.pl-head{flex:0 0 auto;margin:0 0 4px}
-.pl-head .pl-cell{font-size:22px;font-weight:700;letter-spacing:.08em;padding:6px 4px;min-height:36px}
+.pl-head{flex:0 0 auto;flex-shrink:0;margin:0 0 8px;z-index:4;min-height:52px;position:relative}
+.pl-head .pl-cell,.pl-head .pl-cell.pl-ivory{background:linear-gradient(180deg,#fffaf0,#e6d4a8)!important;color:#2a1608!important;-webkit-text-fill-color:#2a1608!important;font-family:var(--flap);font-size:34px;font-weight:800;letter-spacing:.12em;padding:10px 4px;min-height:52px;line-height:1;overflow:visible;text-shadow:none;opacity:1!important}
 #posPlaque{flex:1;min-height:0;display:flex;flex-direction:column;gap:4px;width:100%}
 #posPlaqueGrid{flex:1;display:flex;flex-direction:column;gap:4px;width:100%;position:relative;min-height:0;justify-content:flex-start}
 .pl-row{flex:1 1 30px;min-height:30px}
@@ -194,13 +208,26 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
 </defs></svg>
 <div id="fontseed">ĄĆĘŁŃÓŚŹŻąćęłńóśźż <i>ĄĆĘŁŃÓŚŹŻ 0123456789 $%+-−</i> 🚀★∞≈≠≤≥ Σ АБВГД αβγ 中文日本語한국어 العربية עברית हिंदी ไทย</div>
 <div id="fit"><div id="stage">
-<div class="stagePipe sp-h1" aria-hidden="true"></div>
-<div class="stagePipe sp-h2" aria-hidden="true"></div>
-<div class="stagePipe sp-v2" aria-hidden="true"></div>
+<div class="stagePipe sp-v1" aria-hidden="true"></div>
+<div class="stagePipe sp-v3" aria-hidden="true"></div>
+<div class="stagePipe sp-hTop" aria-hidden="true"></div>
+<div class="stagePipe sp-hMid" aria-hidden="true"></div>
+<div class="stagePipe sp-hLow" aria-hidden="true"></div>
+<div class="pipeJoint pj1" aria-hidden="true"></div>
+<div class="pipeJoint pj2" aria-hidden="true"></div>
+<div class="pipeJoint pj3" aria-hidden="true"></div>
+<div class="pipeJoint pj4" aria-hidden="true"></div>
+<div class="pipeJoint pj5" aria-hidden="true"></div>
+<div class="pipeJoint pj6" aria-hidden="true"></div>
+<div class="pipeJoint pj7" aria-hidden="true"></div>
+<div class="pipeJoint pj8" aria-hidden="true"></div>
 <header id="top">
   <svg class="gearDeco g1" viewBox="0 0 64 64"><g fill="#c9a227" stroke="#3a2410"><circle cx="32" cy="32" r="12"/><rect x="29" y="2" width="6" height="12" transform="rotate(0 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(45 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(90 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(135 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(180 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(225 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(270 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(315 32 32)"/><circle cx="32" cy="32" r="5" fill="#2a1608"/></g></svg>
   <svg class="gearDeco g2" viewBox="0 0 64 64"><g fill="#b87333" stroke="#3a2410"><circle cx="32" cy="32" r="11"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(20 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(70 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(120 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(170 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(220 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(270 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(320 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
   <svg class="gearDeco g3" viewBox="0 0 64 64"><g fill="#e0c36a" stroke="#3a2410"><circle cx="32" cy="32" r="10"/><rect x="30" y="4" width="4" height="10" transform="rotate(15 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(75 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(135 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(195 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(255 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(315 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
+  <svg class="gearDeco g4" viewBox="0 0 64 64"><g fill="#b87333" stroke="#3a2410"><circle cx="32" cy="32" r="11"/><rect x="29" y="3" width="6" height="11" transform="rotate(10 32 32)"/><rect x="29" y="3" width="6" height="11" transform="rotate(70 32 32)"/><rect x="29" y="3" width="6" height="11" transform="rotate(130 32 32)"/><rect x="29" y="3" width="6" height="11" transform="rotate(190 32 32)"/><rect x="29" y="3" width="6" height="11" transform="rotate(250 32 32)"/><rect x="29" y="3" width="6" height="11" transform="rotate(310 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
+  <svg class="gearDeco g5" viewBox="0 0 64 64"><g fill="#e0c36a" stroke="#3a2410"><circle cx="32" cy="32" r="10"/><rect x="30" y="4" width="4" height="10" transform="rotate(0 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(60 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(120 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(180 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(240 32 32)"/><rect x="30" y="4" width="4" height="10" transform="rotate(300 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
+  <svg class="gearDeco g6" viewBox="0 0 64 64"><g fill="#b87333" stroke="#3a2410"><circle cx="32" cy="32" r="11"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(20 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(80 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(140 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(200 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(260 32 32)"/><rect x="29.5" y="3" width="5" height="11" transform="rotate(320 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
   <div class="brand"><div class="word">ARCADE OFFICE</div><div class="sub">DESK PUBLICZNY</div></div>
   <div class="clockWrap">
     <svg id="analogClock" class="clockFace" viewBox="0 0 100 100">
@@ -252,10 +279,12 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
   <div id="scanFoot"><span id="scanReason"></span><span id="scanSrc">feed · DexScreener · GeckoTerminal</span></div>
 </section>
 <section id="pos" class="panel">
+  <svg class="cornerGear tr" viewBox="0 0 64 64"><g fill="#c9a227" stroke="#3a2410"><circle cx="32" cy="32" r="12"/><rect x="29" y="2" width="6" height="12" transform="rotate(0 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(60 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(120 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(180 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(240 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(300 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
+  <svg class="cornerGear bl" viewBox="0 0 64 64"><g fill="#b87333" stroke="#3a2410"><circle cx="32" cy="32" r="12"/><rect x="29" y="2" width="6" height="12" transform="rotate(30 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(90 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(150 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(210 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(270 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(330 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
   <div class="ph"><span>POZYCJE</span><span id="posNote" class="dim"></span><button id="tb" type="button">SZCZEGÓŁY</button></div>
   <div id="posBody">
     <div id="posPlaque">
-      <div class="pl-head"><div class="pl-cell">SYMBOL</div><div class="pl-cell">KIER</div><div class="pl-cell">PNL%</div><div class="pl-cell">1H</div><div class="pl-cell">6H</div><div class="pl-cell">MCAP</div><div class="pl-cell">PASS</div><div class="pl-cell">ST</div></div>
+      <div class="pl-head" id="posHead"><div class="pl-cell pl-ivory">SYMBOL</div><div class="pl-cell pl-ivory">KIER</div><div class="pl-cell pl-ivory">PNL%</div><div class="pl-cell pl-ivory">1H</div><div class="pl-cell pl-ivory">6H</div><div class="pl-cell pl-ivory">MCAP</div><div class="pl-cell pl-ivory">PASS</div><div class="pl-cell pl-ivory">ST</div></div>
       <div id="posPlaqueGrid"></div>
       <div id="posEmptyMsg">BRAK OTWARTYCH POZYCJI</div>
       <div id="posGauges">
@@ -270,6 +299,7 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
   </div>
 </section>
 <section id="port" class="panel">
+  <svg class="cornerGear tr sm" viewBox="0 0 64 64"><g fill="#c9a227" stroke="#3a2410"><circle cx="32" cy="32" r="12"/><rect x="29" y="2" width="6" height="12" transform="rotate(0 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(60 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(120 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(180 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(240 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(300 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
   <div class="ph"><span>PORTFEL</span><span id="portNote" class="dim"></span></div>
   <div id="portGauges">
     <div class="ao-gauge" id="gaugeBank"><svg viewBox="0 0 120 78"><path d="M6 70 A54 54 0 0 1 114 70 L102 70 A42 42 0 0 0 18 70 Z" fill="url(#brassRing)" stroke="#3a2410" stroke-width="1"/><path d="M22 68 A38 38 0 0 1 98 68 Z" fill="url(#ivoryFace)" stroke="#6a5018"/><g stroke="#5a4030" stroke-width="1.3"><line x1="26" y1="62" x2="32" y2="56"/><line x1="42" y1="34" x2="48" y2="42"/><line x1="60" y1="26" x2="60" y2="36"/><line x1="78" y1="34" x2="72" y2="42"/><line x1="94" y1="62" x2="88" y2="56"/></g><line class="ao-needle" x1="60" y1="68" x2="60" y2="32"/><circle cx="60" cy="68" r="4.5" fill="#3a2410" stroke="#c9a227"/></svg><div class="ao-plate"><div class="ao-gname">BANK</div><div class="ao-gval">—</div></div></div>
@@ -279,11 +309,13 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
   <div id="portBody"><div class="slot"><canvas id="portFlap"></canvas></div><div class="chart slot"><canvas id="portChart"></canvas></div></div>
 </section>
 <section id="chat" class="panel">
+  <svg class="cornerGear bl sm" viewBox="0 0 64 64"><g fill="#b87333" stroke="#3a2410"><circle cx="32" cy="32" r="12"/><rect x="29" y="2" width="6" height="12" transform="rotate(30 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(90 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(150 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(210 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(270 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(330 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
   <div class="ph"><span>CZAT</span><div id="tabs"><button id="tg" class="on" type="button">GLOBALNY</button><button id="tz" type="button">STREFA</button></div></div>
   <div id="log"></div>
   <form id="form"><input id="msg" maxlength="200" placeholder="Napisz… (Enter)" autocomplete="off"><button type="submit">OK</button></form>
 </section>
 <section id="events" class="panel">
+  <svg class="cornerGear tr sm" viewBox="0 0 64 64"><g fill="#c9a227" stroke="#3a2410"><circle cx="32" cy="32" r="12"/><rect x="29" y="2" width="6" height="12" transform="rotate(15 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(75 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(135 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(195 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(255 32 32)"/><rect x="29" y="2" width="6" height="12" transform="rotate(315 32 32)"/><circle cx="32" cy="32" r="4" fill="#2a1608"/></g></svg>
   <div class="ph"><span>ZDARZENIA</span></div>
   <div id="plist"></div>
 </section>
