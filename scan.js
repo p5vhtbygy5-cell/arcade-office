@@ -89,6 +89,21 @@ function snapshot(now){
   const base={
     serverNow:now, rotateMs:ROTATE, cycleMs:start, cycleTs, rule, rev,
     index:idx, total:n, showMs:n?ROTATE-into:0,
+    tokens:items.map((it,i)=>{const v=view(it); if(i!==idx){const c=v.chart; if(c) v.chart=null;} return v;}),
+    prev:prev&&Array.isArray(prev.items)?{updatedAt:prev.updatedAt||null, items:prev.items.filter(notCheap).slice(0,12).map(it=>({symbol:it.symbol,chain:it.chain,stage:it.stage,reason:it.reason,price:num(it.price),marketCap:num(it.marketCap),liquidity:num(it.liquidity),change1h:num(it.change1h),address:it.address||null}))}:null,
+    dexError:dexErr, geckoPause:gtPause>now
+  };
+  try{Object.assign(base, extra?extra():null);}catch{}
+  return base;
+}
+function snapshotFull(now){
+  now=now||Date.now();
+  const n=items.length, idx=indexNow(now);
+  const start=Number.isFinite(cycleMs)?cycleMs:now;
+  const into=n?((now-start)%ROTATE+ROTATE)%ROTATE:0;
+  const base={
+    serverNow:now, rotateMs:ROTATE, cycleMs:start, cycleTs, rule, rev,
+    index:idx, total:n, showMs:n?ROTATE-into:0,
     tokens:items.map(view),
     prev:prev&&Array.isArray(prev.items)?{updatedAt:prev.updatedAt||null, items:prev.items.filter(notCheap).slice(0,12).map(it=>({symbol:it.symbol,chain:it.chain,stage:it.stage,reason:it.reason,price:num(it.price),marketCap:num(it.marketCap),liquidity:num(it.liquidity),change1h:num(it.change1h),address:it.address||null}))}:null,
     dexError:dexErr, geckoPause:gtPause>now
@@ -254,5 +269,5 @@ async function tick(){
   maybeEmit(Date.now());
 }
 function start(){setInterval(()=>{tick().catch(e=>console.log('scan', e.message));}, 1000);}
-return {setFromTop, snapshot, start, notCheap, watch, lookup, tick};
+return {setFromTop, snapshot:snapshotFull, start, notCheap, watch, lookup, tick};
 };
