@@ -39,11 +39,13 @@ function paintDigital(el, now){
 function gaugeNeedle(g, min, max, val){
   const v=val==null||!Number.isFinite(+val)?min:(Math.max(min, Math.min(max, +val)));
   const t=(v-min)/(max-min||1);
-  const ang=-135+t*270;
-  const rad=ang*Math.PI/180;
-  const nx=50+Math.cos(rad)*32, ny=50+Math.sin(rad)*32;
-  g.querySelector('.ao-needle').setAttribute('x2', nx.toFixed(2));
-  g.querySelector('.ao-needle').setAttribute('y2', ny.toFixed(2));
+  const ang=Math.PI*(1+t);
+  const cx=60, cy=68, r=34;
+  const nx=cx+Math.cos(ang)*r, ny=cy+Math.sin(ang)*r;
+  const n=g.querySelector('.ao-needle');
+  if(!n) return;
+  n.setAttribute('x1', cx); n.setAttribute('y1', cy);
+  n.setAttribute('x2', nx.toFixed(2)); n.setAttribute('y2', ny.toFixed(2));
 }
 
 function setGauge(id, needleMin, needleMax, needleVal, digital){

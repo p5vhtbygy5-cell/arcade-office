@@ -327,6 +327,23 @@ function drawF(ctx,f,t,hud){
   default: break;
   }
 }
+function drawProps(ctx,t){
+  ctx.save();
+  ctx.strokeStyle='#b87333'; ctx.lineWidth=3; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(8, 28); ctx.lineTo(150, 28); ctx.lineTo(150, 70); ctx.stroke();
+  ctx.fillStyle='#c9a227'; ctx.beginPath(); ctx.arc(150, 70, 5, 0, 7); ctx.fill();
+  ctx.fillStyle='#4a3828'; ctx.strokeStyle='#c9a227'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.ellipse(70, 210, 16, 8, 0, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillRect(54, 168, 32, 44); ctx.strokeRect(54, 168, 32, 44);
+  ctx.fillStyle='#2a2018'; ctx.fillRect(62, 178, 16, 10);
+  const puff=(t/400)%1;
+  ctx.fillStyle='rgba(230,220,200,'+(0.35*(1-puff))+')';
+  ctx.beginPath(); ctx.arc(70, 160-puff*18, 4+puff*3, 0, 7); ctx.fill();
+  ctx.fillStyle='#f4ecd0'; ctx.beginPath(); ctx.arc(W*T-36, 22, 11, 0, 7); ctx.fill();
+  ctx.strokeStyle='#c9a227'; ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W*T-36, 22); ctx.lineTo(W*T-36, 14); ctx.moveTo(W*T-36, 22); ctx.lineTo(W*T-28, 22); ctx.stroke();
+  ctx.restore();
+}
 function drawWorld(ctx,t,state){
   const hud=state.hud||{};
   const Wpx=W*T, Hpx=H*T;
@@ -366,6 +383,7 @@ function drawWorld(ctx,t,state){
     ctx.fillStyle='#1a1008'; ctx.fillRect(x*T,y*T,T,T);
     ctx.fillStyle='#c9a227'; ctx.fillRect(x*T+2,y*T+T-2,T-4,2);
   }
+  drawProps(ctx,t);
   const s=sky();
   if(s.night>0.15){ctx.fillStyle='rgba(8,6,4,'+(0.22*s.night).toFixed(3)+')'; ctx.fillRect(0,0,Wpx,Hpx);}
   const pile=state.printerPile|0;
@@ -446,13 +464,15 @@ function create(canvas){
     w=Math.max(2,w|0); h=Math.max(2,h|0);
     if(canvas.width!==w||canvas.height!==h){canvas.width=w; canvas.height=h;}
     const mapW=W*T, mapH=H*T;
-    sc=Math.max(w/mapW, h/mapH);
+    sc=Math.min(w/mapW, h/mapH);
     ox=(w-mapW*sc)/2; oy=(h-mapH*sc)/2;
   }
   function frame(t, state){
     const ctx=canvas.getContext('2d');
     ctx.setTransform(1,0,0,1,0,0);
-    ctx.fillStyle='#0f0c09';
+    const bg=ctx.createLinearGradient(0,0,0,canvas.height);
+    bg.addColorStop(0,'#3a2818'); bg.addColorStop(1,'#1a120c');
+    ctx.fillStyle=bg;
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.setTransform(sc,0,0,sc,ox,oy);
     ctx.imageSmoothingEnabled=true;
