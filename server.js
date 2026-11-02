@@ -1,13 +1,36 @@
-const express=require('express'),http=require('http'),{Server}=require('socket.io'),path=require('path');
+const express=require('express'),http=require('http'),{Server}=require('socket.io'),path=require('path'),zlib=require('zlib'),crypto=require('crypto');
 const MAP=require('./public/map.js');
-const app=express(),srv=http.createServer(app),io=new Server(srv);
+const app=express(),srv=http.createServer(app),io=new Server(srv,{perMessageDeflate:{threshold:256}});
 const createScan=require('./scan'),createDeskFx=require('./deskfx');
 let lastFeedAt=0;
 const deskFx=createDeskFx({io});
 const scan=createScan({io,extra:()=>({lastFeedAt:lastFeedAt||null}),onEnrich:()=>refreshPositionEnrich()});
 scan.start();
 app.use(express.json({limit:'200kb'}));
-app.use(express.static(path.join(__dirname,'public')));
+function gzipJson(req,res,next){
+  const orig=res.json.bind(res);
+  res.json=function(body){
+    const ae=String(req.headers['accept-encoding']||'');
+    if(!ae.includes('gzip')||res.headersSent) return orig(body);
+    const raw=JSON.stringify(body);
+    zlib.gzip(raw,(err,buf)=>{
+      if(err||buf.length>=raw.length) return orig(body);
+      res.setHeader('Content-Encoding','gzip');
+      res.setHeader('Content-Type','application/json; charset=utf-8');
+      res.end(buf);
+    });
+  };
+  next();
+}
+function sendCachedJson(req,res,body){
+  const tag='"'+crypto.createHash('sha1').update(JSON.stringify(body)).digest('hex')+'"';
+  res.setHeader('ETag', tag);
+  res.setHeader('Cache-Control','private, max-age=8');
+  if(req.headers['if-none-match']===tag) return res.status(304).end();
+  return res.json(body);
+}
+app.use(gzipJson);
+app.use(express.static(path.join(__dirname,'public'),{maxAge:process.env.NODE_ENV==='production'?'86400000':0,etag:true,lastModified:true}));
 app.get('/health',(q,r)=>r.json({ok:true,players:Object.values(players).filter(p=>!p.bot).length,bots:Object.values(players).filter(p=>p.bot).length}));
 const players={};const COLORS=['#ff2bd6','#00f0ff','#39ff14','#ffe600','#ff6b00','#b026ff','#ffffff','#ff3b3b'];
 const clean=(s,n)=>String(s||'').replace(/[<>]/g,'').trim().slice(0,n);
@@ -21,7 +44,7 @@ const BOT_CFG={CHIEF:{color:'#ff3b3b',lines:['Koordynuję zespół...','Odprawa 
  FILLS:{color:'#ff2bd6',lines:['Realizuję zlecenia...','Fill po 68 012 $','Slippage minimalny.','Zlecenie wypełnione ✔']}};
 for(const b of MAP.BOT_DESKS){const c=BOT_CFG[b.name];players['bot-'+b.name]={id:'bot-'+b.name,name:b.name,color:c.color,sprite:0,bot:true,x:b.x,y:b.y,dir:'down',zone:MAP.zoneAt(b.x,b.y)};}
 // ---- Tablica Pozycji: API dla botów ----
-const fs=require('fs'),crypto=require('crypto');
+const fs=require('fs');
 const POS_FILE=process.env.POSITIONS_FILE||path.join(__dirname,'positions.json'),TOKEN_FILE=path.join(__dirname,'.bot-token');
 let BOT_TOKEN=process.env.BOT_API_TOKEN;
 if(!BOT_TOKEN){try{BOT_TOKEN=fs.readFileSync(TOKEN_FILE,'utf8').trim();}catch{}
@@ -100,7 +123,7 @@ async function refreshCrypto(){try{if(top10.items&&top10.items.length>=5&&top10.
   if(!items.length)throw new Error('pusta lista');ticker.crypto={items,updatedAt:Date.now(),error:null,source:'CoinGecko'};}
  catch(e){ticker.crypto={...ticker.crypto,error:'CoinGecko: '+e.message};}io.emit('ticker',tickerOut());}
 if(process.env.TICKER_OFF!=='1'){setTimeout(refreshNews,500);setTimeout(refreshCrypto,2500);setInterval(refreshNews,NEWS_MS);setInterval(refreshCrypto,CRYPTO_MS);}
-app.get('/api/ticker',(q,r)=>r.json(tickerOut()));
+app.get('/api/ticker',(q,r)=>sendCachedJson(q,r,tickerOut()));
 // ---- Desk feed: /workspace/desk/board.json written by desk main.py (state.json + ledger) ----
 const DESK_BOARD=process.env.DESK_BOARD_FILE||'/workspace/desk/board.json';let desk=null,deskMtime=0;
 function deskPosition(){const p=desk&&desk.position;if(!p)return null;const hb=p.latest_heartbeat||{};const ref=p.entry_priceUSD??p.reference_priceUSD??null;
@@ -123,7 +146,7 @@ function publishDesk(){const t=deskTop10();if(t){io.emit('top10',t);scan.setFrom
 function readDesk(){try{const m=fs.statSync(DESK_BOARD).mtimeMs;if(m===deskMtime)return;deskMtime=m;desk=JSON.parse(fs.readFileSync(DESK_BOARD,'utf8'));
   io.emit('positions',allPositions());publishDesk();}catch{}}
 readDesk();setInterval(readDesk,15000);
-app.get('/api/top10',(q,r)=>r.json(deskTop10()||top10));
+app.get('/api/top10',(q,r)=>sendCachedJson(q,r,deskTop10()||top10));
 // ---- POST /api/feed: desk state pushed by sync-feed.js (contract: /workspace/desk/OFFICE_FEED.md) ----
 let portfolio=null; // portfolio history from the feed (optional field, real desk data only)
 const fin=v=>typeof v=='number'&&isFinite(v)?v:null,str=(v,n=40)=>v==null?null:String(v).replace(/[<>]/g,'').slice(0,n);
@@ -225,10 +248,10 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
 app.post('/api/feed',auth,(q,r)=>{const res=applyFeed(q.body);if(res.error)return r.status(400).json({error:'Błędne dane',details:res.error});r.json({ok:true,...res});});
 const noTm=t=>String(t||'').replace(/^\d\d:\d\d /,'');
 const dedupAdj=l=>{const o=[];for(const a of l){const p=o[o.length-1];if(p&&p.bot===a.bot&&noTm(p.text)===noTm(a.text))o[o.length-1]=a;else o.push(a);}return o;};
-app.get('/api/feed',(q,r)=>r.json({lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:dedupAdj(feedActivity).slice(-100),posEvents}));
+app.get('/api/feed',(q,r)=>sendCachedJson(q,r,{lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:dedupAdj(feedActivity).slice(-100),posEvents}));
 app.get('/api/scan',(q,r)=>{try{r.json(scan.snapshot());}catch(e){r.status(500).json({error:'scan'});}});
 app.get('/api/bot-events',(q,r)=>r.json(bots.events()));
-app.get('/api/portfolio',(q,r)=>r.json(portfolio||{empty:true,trades:0,series:[],recent:[],note:'brak historii portfela (feed jeszcze nie przysłał danych)'}));
+app.get('/api/portfolio',(q,r)=>sendCachedJson(q,r,portfolio||{empty:true,trades:0,series:[],recent:[],note:'brak historii portfela (feed jeszcze nie przysłał danych)'}));
 app.get('/api/desk',(q,r)=>r.json(desk||{error:'brak board.json'}));
 io.on('connection',s=>{
   s.emit('top10',deskTop10()||top10);

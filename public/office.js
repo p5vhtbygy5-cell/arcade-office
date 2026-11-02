@@ -86,7 +86,8 @@ function drawPerson(ctx,p,t){
   ctx.restore();
 }
 function drawBot(ctx,p,t){
-  const col=ROLE[p.name]||'#9ab';
+  const col='#c9a227';
+  const accent=ROLE[p.name]||'#b87333';
   const walking=p.act==='walk';
   const bob=walking?Math.sin(t/130)*1.2:Math.sin(t/420+p.name.length)*0.5;
   const step=walking?Math.sin(t/100)*2.4:0;
@@ -95,26 +96,27 @@ function drawBot(ctx,p,t){
   if(p.dir==='left') ctx.scale(-1,1);
   ctx.fillStyle='rgba(0,0,0,.38)';
   ctx.beginPath(); ctx.ellipse(0,2,8,2.8,0,0,7); ctx.fill();
-  ctx.fillStyle='#0c1018';
+  ctx.fillStyle='#2a2018';
   ctx.fillRect(-5,-2+step,3.2,7); ctx.fillRect(2,-2-step,3.2,7);
-  ctx.fillStyle=col;
-  rr(ctx,-8,-18,16,16,4); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,.3)';
+  ctx.fillStyle=accent;
+  rr(ctx,-8,-18,16,16,3); ctx.fill();
+  ctx.strokeStyle='#c9a227'; ctx.lineWidth=.8; ctx.stroke();
+  ctx.fillStyle='rgba(255,240,210,.25)';
   ctx.fillRect(-6,-16,12,2);
-  ctx.fillStyle='#d5e2f4';
-  rr(ctx,-7,-30,14,13,4); ctx.fill();
+  ctx.fillStyle='#e8dcc8';
+  rr(ctx,-7,-30,14,13,3); ctx.fill();
   const blink=(t/160|0)%18===0;
-  ctx.fillStyle='#0e141e';
+  ctx.fillStyle='#1a1008';
   rr(ctx,-5,-26,10,4.5,1.4); ctx.fill();
   if(!blink){ctx.fillStyle=col; ctx.fillRect(-3.2,-25,2,2.4); ctx.fillRect(1.2,-25,2,2.4);}
-  ctx.fillStyle=col;
-  if(p.name==='CHIEF'){ctx.beginPath(); ctx.moveTo(-6,-30); ctx.lineTo(-4,-36); ctx.lineTo(-1,-31); ctx.lineTo(1,-37); ctx.lineTo(4,-31); ctx.lineTo(6,-36); ctx.lineTo(7,-30); ctx.fill();}
-  else if(p.name==='SCAN'){ctx.fillRect(0,-38,1.4,8); ctx.beginPath(); ctx.arc(0.7,-39,2.4,0,7); ctx.fill(); if((t/200|0)%2){ctx.fillStyle='#fff'; ctx.fillRect(-0.2,-40,1.2,1.2);}}
-  else if(p.name==='RISK'){ctx.fillStyle=(t/280|0)%2?col:'#fff'; rr(ctx,-3,-38,6,8,2); ctx.fill();}
-  else if(p.name==='VET'){ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(4,-24,3.2,0,7); ctx.stroke();}
-  else if(p.name==='FILLS'){ctx.fillRect(-4,-36,1.3,6); ctx.fillRect(3,-36,1.3,6); ctx.beginPath(); ctx.arc(-3.4,-37,1.6,0,7); ctx.arc(3.6,-37,1.6,0,7); ctx.fill();}
-  else if(p.name==='SIZE'){ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(0,-34,3.5,0,7); ctx.stroke(); ctx.fillRect(-0.4,-34,4,1);}
-  else if(p.name==='BOOK'){ctx.fillStyle='#123'; rr(ctx,-5,-34,10,4,1); ctx.fill(); ctx.fillStyle=col; ctx.fillRect(-4,-33,8,2);}
+  ctx.font='700 6px '+UI();
+  const nw=ctx.measureText(p.name).width+6;
+  ctx.fillStyle='#2a2018';
+  rr(ctx,-nw/2,-36,nw,8,2); ctx.fill();
+  ctx.strokeStyle='#c9a227'; ctx.stroke();
+  ctx.fillStyle='#f4ecd8';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(p.name, 0, -32);
   if(p.carry){ctx.fillStyle='#f6edd8'; rr(ctx,7,-14,8,9,1); ctx.fill(); ctx.fillStyle='#243'; ctx.fillRect(8,-11,6,1); ctx.fillRect(8,-8,4,1);}
   ctx.restore();
 }
@@ -318,9 +320,9 @@ function drawF(ctx,f,t,hud){
 }
 function drawWorld(ctx,t,state){
   const hud=state.hud||{};
-  ctx.fillStyle='#10192e';
+  ctx.fillStyle='#1a120c';
   ctx.fillRect(0,0,W*T,H*T);
-  ctx.strokeStyle='rgba(130,170,255,.12)';
+  ctx.strokeStyle='rgba(201,162,39,.08)';
   ctx.lineWidth=1;
   for(let x=0;x<=W;x++){ctx.beginPath(); ctx.moveTo(x*T+0.5,0); ctx.lineTo(x*T+0.5,H*T); ctx.stroke();}
   for(let y=0;y<=H;y++){ctx.beginPath(); ctx.moveTo(0,y*T+0.5); ctx.lineTo(W*T,y*T+0.5); ctx.stroke();}
@@ -334,9 +336,9 @@ function drawWorld(ctx,t,state){
   for(let y=0;y<H;y++) for(let x=0;x<W;x++){
     if(!solid[y][x]||occ.has(x+','+y)) continue;
     const X=x*T,Y=y*T;
-    ctx.fillStyle=wallFace[y][x]?'#24324c':'#1a2438';
+    ctx.fillStyle=wallFace[y][x]?'#4a3828':'#2a2018';
     ctx.fillRect(X,Y,T,T);
-    if(wallFace[y][x]){ctx.fillStyle='#3ee0ff'; ctx.globalAlpha=.55; ctx.fillRect(X,Y,T,2); ctx.globalAlpha=1;}
+    if(wallFace[y][x]){ctx.fillStyle='#c9a227'; ctx.globalAlpha=.45; ctx.fillRect(X,Y,T,2); ctx.globalAlpha=1;}
     else {ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(X,Y+T-3,T,3);}
   }
   for(const [x,y] of DOORS){
@@ -429,7 +431,7 @@ function create(canvas){
   function frame(t, state){
     const ctx=canvas.getContext('2d');
     ctx.setTransform(1,0,0,1,0,0);
-    ctx.fillStyle='#070b14';
+    ctx.fillStyle='#0f0c09';
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.setTransform(sc,0,0,sc,ox,oy);
     ctx.imageSmoothingEnabled=true;
