@@ -774,7 +774,7 @@ function tickMarquee(id, speed, t){
   const w=track.scrollWidth/2; if(w<10) return;
   track.style.transform='translateX('+(-((t/1000*speed)%w))+'px)';
 }
-function paintChrome(){
+function paintChrome(now){
   if(window.AO_STEAMPUNK) AO_STEAMPUNK.tick(Date.now(), gaugeState());
   else{
     try{clock.textContent=new Date().toLocaleTimeString('pl-PL',{timeZone:'Europe/Warsaw',hour:'2-digit',minute:'2-digit',second:'2-digit'})+'  WAW';}catch(e){clock.textContent=new Date().toLocaleTimeString();}
@@ -997,7 +997,7 @@ function frame(t){
   drawBank($('portChart'), portDraw||portfolio);
   nameFlap.frame(t); priceFlap.frame(t); statFlap.frame(t); portFlap.frame(t);
   office.frame(t, {players, me, printerPile, bubbles, hud:hud()});
-  drawFx(t); paintChrome();
+  drawFx(t); paintChrome(t);
   const p=players[me];
   if(p){
     const z=zoneAt(p.x,p.y);
