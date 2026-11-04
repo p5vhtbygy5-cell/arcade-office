@@ -171,6 +171,16 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
  const s4=fl.find(p=>p.feedId==='s4');
  chk(fr.s===200&&s4&&s4.steps==null,'steps jako string jest odrzucany, feed 200');
+ fr=await fp({positions:[row('s5',{symbol:'CLAMP',steps:{done:-2,total:99,runner:'yes',last:'50',peak:NaN}})],activity:[]});
+ fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
+ const s5=fl.find(p=>p.feedId==='s5');
+ chk(fr.s===200&&s5&&s5.steps&&s5.steps.done===0&&s5.steps.total===6&&s5.steps.runner===false&&s5.steps.last===null&&s5.steps.peak==null,'steps: typy i zakresy sanitizowane');
+ fr=await fp({positions:[row('s6',{symbol:'ARR',steps:[]})],activity:[]});
+ fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
+ const s6=fl.find(p=>p.feedId==='s6');
+ chk(fr.s===200&&s6&&s6.steps==null,'steps jako tablica jest odrzucany');
+ const gf3=await fetch(F).then(r=>r.json());
+ chk(gf3.positions.some(p=>p.feedId==='s6'&&p.steps==null),'GET /api/feed nie zgłasza fałszywego steps');
  fr=await fp({positions:[row('h24',{symbol:'DAY24',h24:12.5,change24h:null,h1:1,h6:2})],activity:[]});
  fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
  const d24=fl.find(p=>p.feedId==='h24');
