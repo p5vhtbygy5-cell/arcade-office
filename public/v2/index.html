@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Arcade Office — tablica v2</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect fill='%231a120c' width='16' height='16'/%3E%3Ccircle cx='8' cy='8' r='5' fill='none' stroke='%23c9a227' stroke-width='1.2'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Chakra+Petch:wght@500;600;700&family=Cinzel:wght@700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/v2/v2.css">
+</head>
+<body>
+<div id="fit">
+<div id="board">
+  <div class="gears" aria-hidden="true">
+    <img class="gear g-tl" src="/v2/assets/gear-1.webp" srcset="/v2/assets/gear-1.webp 1x, /v2/assets/gear-1@2x.webp 2x" alt="">
+    <img class="gear g-tr" src="/v2/assets/gear-2.webp" srcset="/v2/assets/gear-2.webp 1x, /v2/assets/gear-2@2x.webp 2x" alt="">
+    <img class="gear g-bl" src="/v2/assets/gear-3.webp" srcset="/v2/assets/gear-3.webp 1x, /v2/assets/gear-3@2x.webp 2x" alt="">
+    <img class="gear g-br" src="/v2/assets/gear-1.webp" srcset="/v2/assets/gear-1.webp 1x, /v2/assets/gear-1@2x.webp 2x" alt="">
+    <img class="gear g-cl" src="/v2/assets/gear-3.webp" srcset="/v2/assets/gear-3.webp 1x, /v2/assets/gear-3@2x.webp 2x" alt="">
+    <img class="gear g-cr" src="/v2/assets/gear-2.webp" srcset="/v2/assets/gear-2.webp 1x, /v2/assets/gear-2@2x.webp 2x" alt="">
+  </div>
+
+  <header id="top">
+    <div class="brand">
+      <div class="word">ARCADE OFFICE</div>
+      <div class="sub">DESK PUBLICZNY</div>
+    </div>
+    <div class="topRight">
+      <button id="audioBtn" type="button">WŁĄCZ DŹWIĘK</button>
+      <input id="nick" maxlength="16" placeholder="imię" autocomplete="off" spellcheck="false">
+      <button id="go" type="button">WEJDŹ</button>
+      <div id="online">Online: 0</div>
+    </div>
+  </header>
+  <div class="clockWrap">
+    <div class="clock" id="clock">
+      <div class="clockFace" aria-hidden="true"></div>
+      <svg class="clockHands" viewBox="0 0 100 100" aria-hidden="true">
+        <g class="clockNums" fill="#2a1a08" font-size="7.2" font-family="Cinzel,serif" font-weight="700" text-anchor="middle"></g>
+        <line id="aoHr" x1="50" y1="50" x2="50" y2="30" stroke="#2a1a08" stroke-width="2.6" stroke-linecap="round"/>
+        <line id="aoMin" x1="50" y1="50" x2="50" y2="20" stroke="#3a2410" stroke-width="1.7" stroke-linecap="round"/>
+        <line id="aoSec" x1="50" y1="52" x2="50" y2="16" stroke="#8a2a1a" stroke-width="0.9" stroke-linecap="round"/>
+        <circle cx="50" cy="50" r="2.6" fill="#1a1008"/>
+      </svg>
+    </div>
+    <div id="digitalClock">--:--:--</div>
+    <div id="feedAge">feed: —</div>
+  </div>
+
+  <section id="pipeline" aria-label="Stanowiska">
+    <article class="station" data-seat="SCAN"></article>
+    <div class="pipe-run" aria-hidden="true"><div class="pipe"><i class="flow"></i></div><div class="joint"></div></div>
+    <article class="station" data-seat="VET"></article>
+    <div class="pipe-run" aria-hidden="true"><div class="pipe"><i class="flow"></i></div><div class="joint"></div></div>
+    <article class="station" data-seat="BOOK"></article>
+    <div class="clock-gap" aria-hidden="true">
+      <div class="u-pipe">
+        <div class="u-left"></div>
+        <div class="u-bot"><i class="flow"></i></div>
+        <div class="u-right"></div>
+        <div class="joint j-l"></div>
+        <div class="joint j-r"></div>
+      </div>
+    </div>
+    <article class="station" data-seat="SIZE"></article>
+    <div class="pipe-run" aria-hidden="true"><div class="pipe"><i class="flow"></i></div><div class="joint"></div></div>
+    <article class="station" data-seat="FILLS"></article>
+    <div class="pipe-run" aria-hidden="true"><div class="pipe"><i class="flow"></i></div><div class="joint"></div></div>
+    <article class="station" data-seat="RISK"></article>
+  </section>
+
+  <section id="pos" class="panel" aria-label="Pozycje">
+    <div class="ph"><span>POZYCJE</span><span id="posNote" class="dim"></span></div>
+    <div id="posTable">
+      <div class="pl-head" id="posHead"></div>
+      <div id="posBody"></div>
+      <div id="posEmpty">BRAK OTWARTYCH POZYCJI</div>
+    </div>
+  </section>
+
+  <section id="gauges" aria-label="Wskaźniki">
+    <div class="ao-gauge" id="gaugePosOpen" data-kind="pos"></div>
+    <div class="ao-gauge" id="gaugeTrail" data-kind="trail"></div>
+    <div class="ao-gauge" id="gaugeDayPnl" data-kind="pnl"></div>
+    <div class="ao-gauge bipolar" id="gaugeDayTrades" data-kind="trades"></div>
+    <div class="ao-gauge" id="gaugeFees" data-kind="fees"></div>
+  </section>
+
+  <section id="bottom">
+    <section id="port" class="panel">
+      <div class="ph"><span>PORTFEL</span><span id="portNote" class="dim"></span></div>
+      <div id="portBody">
+        <div class="portStats">
+          <div class="bankLine"><span>BANK</span><b id="portBank">—</b></div>
+          <div class="kv"><span>ROI</span><b id="portRoi">—</b></div>
+          <div class="kv"><span>WIN %</span><b id="portWin">—</b></div>
+          <div class="kv"><span>TRADES</span><b id="portTrades">—</b></div>
+          <div class="kv"><span>FEES</span><b id="portFees">—</b></div>
+        </div>
+        <canvas id="portChart" width="520" height="160"></canvas>
+      </div>
+    </section>
+    <section id="chat" class="panel">
+      <div class="ph"><span>CZAT</span></div>
+      <div id="log"></div>
+      <form id="form"><input id="msg" maxlength="200" placeholder="Napisz… (Enter)" autocomplete="off"><button type="submit">OK</button></form>
+    </section>
+    <section id="events" class="panel">
+      <div class="ph"><span>ZDARZENIA</span></div>
+      <div id="plist"></div>
+    </section>
+  </section>
+
+  <div id="ticker" class="ticker" aria-label="Wiadomości i krypto">
+    <div class="lab">WIADOMOŚCI · KRYPTO</div>
+    <div class="view"><div class="track" id="tickTrack"></div></div>
+    <div id="fixtureBanner" hidden>DANE FIXTURE — nie live</div>
+  </div>
+</div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/audio.js"></script>
+<script src="/v2/v2.js"></script>
+</body>
+</html>

@@ -30,6 +30,8 @@ function sendCachedJson(req,res,body){
   return res.json(body);
 }
 app.use(gzipJson);
+const v2Index=path.join(__dirname,'public','v2','index.html');
+app.get(['/v2','/v2/'],(q,r)=>r.sendFile(v2Index));
 app.use(express.static(path.join(__dirname,'public'),{maxAge:process.env.NODE_ENV==='production'?'86400000':0,etag:true,lastModified:true}));
 app.get('/health',(q,r)=>r.json({ok:true,players:Object.values(players).filter(p=>!p.bot).length,bots:Object.values(players).filter(p=>p.bot).length}));
 const players={};const COLORS=['#ff2bd6','#00f0ff','#39ff14','#ffe600','#ff6b00','#b026ff','#ffffff','#ff3b3b'];
@@ -167,7 +169,7 @@ function pickStages(raw, events, pf){
   return ok(hist)?hist:null;
 }
 function cleanPortfolio(p){if(!p||typeof p!=='object')return null;const tr=t=>{if(!t||typeof t!=='object')return null;const displaySymbol=nameField(t.displaySymbol),token=nameField(t.token)||displaySymbol;if(!token)return null;return {token,displaySymbol,net:fin(t.net),pct:fin(t.pct),closed:str(t.closed,40),partial:!!t.partial};};
-  return {start:fin(p.start)??1000,bank:fin(p.bank),realizedPnl:fin(p.realizedPnl),roiPct:fin(p.roiPct),trades:Math.max(0,fin(p.trades)|0),partial:Math.max(0,fin(p.partial)|0),closes:fin(p.closes)==null?null:Math.max(0,p.closes|0),tiers:Array.isArray(p.tiers)?[0,1,2].map(i=>Math.max(0,fin(p.tiers[i])|0)):null,openFull:fin(p.open_full)==null?null:Math.max(0,p.open_full|0),openTiers:Array.isArray(p.open_tiers)?[0,1,2,3].map(i=>Math.max(0,fin(p.open_tiers[i])|0)):null,wins:Math.max(0,fin(p.wins)|0),losses:Math.max(0,fin(p.losses)|0),
+  return {start:fin(p.start)??1000,bank:fin(p.bank),realizedPnl:fin(p.realizedPnl),roiPct:fin(p.roiPct),trades:Math.max(0,fin(p.trades)|0),partial:Math.max(0,fin(p.partial)|0),closes:fin(p.closes)==null?null:Math.max(0,p.closes|0),tiers:Array.isArray(p.tiers)?[0,1,2].map(i=>Math.max(0,fin(p.tiers[i])|0)):null,openFull:fin(p.open_full)==null?null:Math.max(0,p.open_full|0),openTiers:Array.isArray(p.open_tiers)?[0,1,2,3].map(i=>Math.max(0,fin(p.open_tiers[i])|0)):null,wins:Math.max(0,fin(p.wins)|0),losses:Math.max(0,fin(p.losses)|0),fees:fin(p.fees??p.feesUsd),
    winRate:fin(p.winRate),maxDrawdownPct:fin(p.maxDrawdownPct),maxDrawdownUsd:fin(p.maxDrawdownUsd),best:tr(p.best),worst:tr(p.worst),mode:str(p.mode,8),updatedAt:str(p.updatedAt),receivedAt:Date.now(),
    series:(Array.isArray(p.series)?p.series:[]).slice(-500).map(x=>({ts:Date.parse(x&&x.ts)||null,bank:fin(x&&x.bank)})).filter(x=>x.ts&&x.bank!=null),
    recent:(Array.isArray(p.recent)?p.recent:[]).slice(0,10).map(x=>{const displaySymbol=nameField(x&&x.displaySymbol),token=nameField(x&&x.token)||displaySymbol;return {ts:Date.parse(x&&x.ts)||null,kind:x&&x.kind=='close'?'close':'open',token,displaySymbol,net:fin(x&&x.net),pct:fin(x&&x.pct),size:fin(x&&x.size),partial:!!(x&&x.partial),runner:!!(x&&x.runner),mode:str(x&&x.mode,8)};}).filter(x=>x.token)};}const feedSeen=new Set(),feedActivity=[];let posEvents=[];
@@ -185,6 +187,12 @@ function cleanSteps(s){
   const done=done0==null?0:Math.max(0,Math.min(total,done0));
   return {done,total,last:fin(s.last),next:fin(s.next),runner:s.runner===true,peak:fin(s.peak)};
 }
+function cleanImage(v){
+  if(typeof v!=='string')return null;
+  const s=v.trim().slice(0,400);
+  if(!/^https?:\/\//i.test(s)||/[<>"\s]/.test(s))return null;
+  return s;
+}
 function livePnl(p){const b=p.pnlBase;if(b==null||!isFinite(b)||!b||p.price==null||!isFinite(+p.price))return null;return (p.price-b)/b*100*(p.side==='SHORT'?-1:1);}
 const enrSig=new WeakMap();
 function enrichPosition(p){if(!p||!p.address)return false;const v=scan.lookup(p.address);if(!v)return false;
@@ -193,7 +201,7 @@ function enrichPosition(p){if(!p||!p.address)return false;const v=scan.lookup(p.
   if(p.h1==null&&v.change1h!=null)p.h1=v.change1h;
   if(p.h6==null&&p.change6h==null&&v.change6h!=null){p.h6=v.change6h;p.change6h=v.change6h;}
   if(p.mcap==null&&v.marketCap!=null)p.mcap=v.marketCap;
-  p.change5m=v.change5m;p.change24h=v.change24h;p.volume1h=v.volume1h;p.fdv=v.fdv;p.buys1h=v.buys1h;p.sells1h=v.sells1h;p.pairCreatedAt=v.pairCreatedAt;p.holders=v.holders;p.holdersTop10=v.holdersTop10;
+  p.change5m=v.change5m;p.change24h=v.change24h;if(v.change24h!=null)p.h24=v.change24h;p.volume1h=v.volume1h;p.fdv=v.fdv;p.buys1h=v.buys1h;p.sells1h=v.sells1h;p.pairCreatedAt=v.pairCreatedAt;p.holders=v.holders;p.holdersTop10=v.holdersTop10;
   if(v.chart)p.chart=v.chart;if(v.image&&!p.image)p.image=v.image;return true;}
 function refreshPositionEnrich(){let changed=false;for(const p of Object.values(positions))if(p&&p.feed&&enrichPosition(p))changed=true;if(changed)io.emit('positions',allPositions());}
 function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['body: obiekt JSON']};
@@ -210,7 +218,7 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
     // Zlotr 2026-10-23 21:34: positions carry mcap, h1, h6/change6h, pass{n,wins,losses} for TABLICA
     clean.push({id:'feed-'+id.replace(/[^A-Za-z0-9_-]/g,'_'),feedId:id,feed:true,desk:true,bot,symbol,displaySymbol,address:cleanAddr(p.address),peakPct:fin(p.peakPct),side,mode,size,sizeUsd:size,entry,ref,pnlBase:entry??ref,price,
       chain:p.chain?String(p.chain).slice(0,20):null,status:p.status?String(p.status).replace(/[<>]/g,'').slice(0,200):'',note:[p.chain,p.status].filter(Boolean).join(' · ').replace(/[<>]/g,'').slice(0,200),
-      tiers:(Number.isInteger(p.tiers)&&p.tiers>=0&&p.tiers<=4)?p.tiers:0,h1:fin(p.h1),h6:fin(p.h6??p.change6h),change6h:fin(p.change6h??p.h6),mcap:fin(p.mcap),pass:(p.pass&&typeof p.pass==='object')?{n:Math.max(0,fin(p.pass.n)|0),wins:Math.max(0,fin(p.pass.wins)|0),losses:Math.max(0,fin(p.pass.losses)|0)}:{n:0,wins:0,losses:0},steps:cleanSteps(p.steps),openedAt:Date.parse(p.openedAt)||Date.now(),updatedAt:Date.now(),priceSource:'desk'});});
+      tiers:(Number.isInteger(p.tiers)&&p.tiers>=0&&p.tiers<=4)?p.tiers:0,h1:fin(p.h1),h6:fin(p.h6??p.change6h),change6h:fin(p.change6h??p.h6),h24:fin(p.h24??p.change24h),change24h:fin(p.change24h??p.h24),mcap:fin(p.mcap),pass:(p.pass&&typeof p.pass==='object')?{n:Math.max(0,fin(p.pass.n)|0),wins:Math.max(0,fin(p.pass.wins)|0),losses:Math.max(0,fin(p.pass.losses)|0)}:{n:0,wins:0,losses:0},steps:cleanSteps(p.steps),image:cleanImage(p.image),openedAt:Date.parse(p.openedAt)||Date.now(),updatedAt:Date.now(),priceSource:'desk'});});
   if(errs.length)return {error:errs};
   lastFeedAt=Date.now();const res={opened:[],updated:[],closed:[],activity:0};const ids=new Set(clean.map(p=>p.id));
   scan.watch(clean.filter(p=>p.address).map(p=>({address:p.address,chain:p.chain,symbol:p.symbol,displaySymbol:p.displaySymbol})));
