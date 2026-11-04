@@ -99,7 +99,8 @@ function fmtK(v){
 }
 const STAGE_NAME=['0','I','II','III','IV'];
 
-function cellClass(kind, val){
+function cellClass(kind, val, extra){
+  if(kind==='st'&&(extra==='trail'||val==='T')) return 'pl-gold';
   if(kind==='sym'||kind==='dir'||kind==='mcap'||kind==='pass'||kind==='st') return 'pl-ivory';
   if(kind==='pnl'||kind==='h1'||kind==='h6'){
     if(val==null||!Number.isFinite(+val)) return 'pl-ivory';
@@ -135,19 +136,20 @@ function renderPosPlaques(posSnap, pnlOf, stageOf, showName){
     }
     const pnl=p.pnl, h1=p.h1, h6=p.h6;
     const dir=p.side==='SHORT'?('▼S'):('▲L');
-    const st=p.st, stTxt=st==null?'':(STAGE_NAME[st]||'');
+    const stTxt=p.stTxt!=null?p.stTxt:(p.st==null?'':(STAGE_NAME[p.st]||''));
+    const hasSteps=p.steps&&typeof p.steps==='object';
     const cells=[
-      {k:'sym', t:(p.tiers>=1&&p.tiers<=3?(4-p.tiers)+'/4 ':'')+(p.name||''), v:null},
+      {k:'sym', t:(!hasSteps&&p.tiers>=1&&p.tiers<=3?(4-p.tiers)+'/4 ':'')+(p.name||''), v:null},
       {k:'dir', t:dir, v:null},
       {k:'pnl', t:fmtPct(pnl), v:pnl},
       {k:'h1', t:fmtPct(h1), v:h1},
       {k:'h6', t:fmtPct(h6), v:h6},
       {k:'mcap', t:fmtK(p.mcap), v:null},
       {k:'pass', html:passHtml(p.pass), v:null},
-      {k:'st', t:stTxt, v:null}
+      {k:'st', t:stTxt, v:stTxt, extra:p.stKind}
     ];
     rows.push(cells.map(c=>{
-      const cls='pl-cell '+cellClass(c.k,c.v);
+      const cls='pl-cell '+cellClass(c.k,c.v,c.extra);
       if(c.html) return '<div class="'+cls+' pl-pass">'+c.html+'</div>';
       return '<div class="'+cls+'">'+escapeHtml(c.t)+'</div>';
     }).join(''));

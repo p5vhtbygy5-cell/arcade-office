@@ -5,7 +5,9 @@ const COLORS=['#ff2bd6','#00f0ff','#39ff14','#ffe600','#ff6b00','#b026ff','#ffff
 const INK='#3a2818', DIM='#6a5e4a', LAB='#8a7a60', NEUTRAL='#3a2818', GOOD='#2d6a3a', BAD='#8a3030', CYAN='#c9a227', AMBER='#e8b84a', CREAM='#fff8e7';
 const POSITIONS_REFRESH_MS=30000, PORTFOLIO_REFRESH_MS=30000, POS_PAGE_MS=10000, POS_MIN_CELL=24, POS_ROW_LIMIT=10;
 const STAGE_NAME=['0','I','II','III','IV'];
-const STAGE_COL={'STAGE 0':'#b8ffb8','0':'#b8ffb8','I':'#7dff7d','II':'#3dff7a','III':'#1fb855','IV':'#0d7a35'};
+const STEP_ROMAN=['0','I','II','III','IV','V','VI'];
+const GOLD='#e8b84a';
+const STAGE_COL={'STAGE 0':'#b8ffb8','0':'#b8ffb8','I':'#7dff7d','II':'#3dff7a','III':'#1fb855','IV':'#0d7a35','V':'#0a5c28','VI':'#08441e','T':GOLD};
 const graphs=FLAP.graphs;
 const $=id=>document.getElementById(id);
 const stage=$('stage'), audioBtn=$('audioBtn'), clock=$('clock'), feedAge=$('feedAge');
@@ -168,6 +170,16 @@ function stageOf(p){
   if(b&&b.stage>st&&!(p.openedAt&&b.ts&&b.ts<p.openedAt)) st=b.stage;
   return st;
 }
+function stDisplay(p){
+  const s=p&&p.steps;
+  if(s&&typeof s==='object'){
+    if(s.runner) return {txt:'T', kind:'trail'};
+    const done=Math.max(0, Math.min(6, s.done|0));
+    return {txt:STEP_ROMAN[done]||'0', kind:done?'step':'zero'};
+  }
+  const st=stageOf(p);
+  return {txt:st==null?'':(STAGE_NAME[st]||''), kind:'peak'};
+}
 function forgetStage(id){if(id) delete riskBadge[id];}
 function pruneStages(){
   const live=new Set(Object.keys(positions));
@@ -312,9 +324,11 @@ function fitParts(parts, w){
   return out;
 }
 function posLine(p){
-  const tier=(p.tiers>=1&&p.tiers<=3)?(4-p.tiers)+'/4 ':'';
+  const hasSteps=p.steps&&typeof p.steps==='object';
+  const tier=(!hasSteps&&p.tiers>=1&&p.tiers<=3)?(4-p.tiers)+'/4 ':'';
   const pass=p.pass||{}, n=pass.n|0;
-  const st=p.st, stTxt=st==null?'':(STAGE_NAME[st]||''), stCol=st==null?DIM:(STAGE_COL[STAGE_NAME[st]]||GOOD);
+  const disp=p.stTxt!=null?{txt:p.stTxt,kind:p.stKind}:stDisplay(p);
+  const stTxt=disp.txt||'', stCol=!stTxt?DIM:(disp.kind==='trail'?GOLD:(STAGE_COL[stTxt]||GOOD));
   const passBody=!n?[{t:'0',c:'#fff'}]:[{t:String(n),c:'#fff'},{t:'(',c:'#fff'},{t:String(pass.wins|0),c:GOOD},{t:',',c:'#fff'},{t:String(pass.losses|0),c:BAD},{t:')',c:'#fff'}];
   const parts=[
     cell(tier+(p.name||''),16,INK), colGap(),
@@ -328,13 +342,14 @@ function posLine(p){
   return spanRow(parts);
 }
 function snapPos(p){
+  const disp=stDisplay(p);
   return {id:p.id, name:showName(p), side:p.side, tiers:p.tiers|0,
     pnl:rnd1(pnlOf(p)), h1:rnd1(p.h1), h6:rnd1(p.h6!=null?p.h6:p.change6h), mcap:p.mcap,
     pass:p.pass?{n:p.pass.n|0,wins:p.pass.wins|0,losses:p.pass.losses|0}:{n:0,wins:0,losses:0},
-    st:stageOf(p), openedAt:p.openedAt||0};
+    st:stageOf(p), stTxt:disp.txt, stKind:disp.kind, steps:p.steps||null, openedAt:p.openedAt||0};
 }
 function posPageSize(){return POS_ROW_LIMIT;}
-function posPlaqueSig(rows){return rows.map(p=>[p.id,p.pnl,p.h1,p.h6,p.mcap,p.st,p.side,p.name,p.pass&&p.pass.n].join(',')).join('|');}
+function posPlaqueSig(rows){return rows.map(p=>[p.id,p.pnl,p.h1,p.h6,p.mcap,p.stTxt||p.st,p.stKind,p.side,p.name,p.pass&&p.pass.n].join(',')).join('|');}
 function syncPos(force){
   const now=Date.now();
   const all=Object.values(positions);
@@ -348,6 +363,9 @@ function syncPos(force){
       if(!p) continue;
       const st=stageOf(p);
       if(st!==s.st){s.st=st; stageChanged=true;}
+      const disp=stDisplay(p);
+      if(disp.txt!==s.stTxt||disp.kind!==s.stKind){s.stTxt=disp.txt; s.stKind=disp.kind; stageChanged=true;}
+      s.steps=p.steps||null;
       const np=rnd1(pnlOf(p));
       if(np!==s.pnl){s.pnl=np; stageChanged=true;}
     }
@@ -361,7 +379,7 @@ function syncPos(force){
     posPage=0; posPageAt=now;
   }
   const count=all.length;
-  const note=(count?count+' pozycji':'brak')+'  ·  PASS = N(wygrane, przegrane)  ·  ST = szczyt';
+  const note=(count?count+' pozycji':'brak')+'  ·  PASS = N(wygrane, przegrane)  ·  ST = kroki';
   if($('posNote').textContent!==note) $('posNote').textContent=note;
   const sig=posPlaqueSig(posSnap);
   if(!force&&sig===posVis) return;
@@ -951,17 +969,17 @@ function applyDemoFeed(){
     series:[{ts:now-86400000*3,bank:520},{ts:now-86400000*2,bank:505},{ts:now-86400000,bank:492},{ts:now,bank:487.32}],
     best:{token:'CZ',displaySymbol:'CZ',net:41.2,pct:38},worst:{token:'MOG',displaySymbol:'MOG',net:-18.4,pct:-22}};
   const defs=[
-    {sym:'CZ',disp:'CZ',pnl:18.4,h1:12.1,h6:42,m:2.1e6,pass:{n:3,wins:2,losses:1},st:2},
-    {sym:'WIF',disp:'WIF',pnl:-4.2,h1:-2.1,h6:8.5,m:890e6,pass:{n:1,wins:0,losses:1},st:1},
-    {sym:'BONK',disp:'BONK',pnl:6.8,h1:4.2,h6:15.2,m:1.4e9,pass:{n:2,wins:1,losses:1},st:0},
-    {sym:'PEPE',disp:'PEPE',pnl:22.1,h1:18,h6:55,m:3.2e9,pass:{n:4,wins:3,losses:1},st:3},
-    {sym:'MOG',disp:'MOG',pnl:-11.3,h1:-8.4,h6:-12,m:45e6,pass:{n:0,wins:0,losses:0},st:0}
+    {sym:'CZ',disp:'CZ',pnl:18.4,h1:12.1,h6:42,m:2.1e6,pass:{n:3,wins:2,losses:1},steps:{done:2,total:6,runner:false}},
+    {sym:'WIF',disp:'WIF',pnl:-4.2,h1:-2.1,h6:8.5,m:890e6,pass:{n:1,wins:0,losses:1},steps:{done:0,total:6,runner:false}},
+    {sym:'BONK',disp:'BONK',pnl:6.8,h1:4.2,h6:15.2,m:1.4e9,pass:{n:2,wins:1,losses:1},peakPct:80},
+    {sym:'PEPE',disp:'PEPE',pnl:22.1,h1:18,h6:55,m:3.2e9,pass:{n:4,wins:3,losses:1},steps:{done:6,total:6,last:300,next:null,runner:true,peak:310}},
+    {sym:'MOG',disp:'MOG',pnl:-11.3,h1:-8.4,h6:-12,m:45e6,pass:{n:0,wins:0,losses:0},steps:{done:5,total:6,runner:false}}
   ];
   positions={};
   defs.forEach((d,i)=>{
     const entry=0.001*(i+1), price=entry*(1+d.pnl/100);
     positions['demo-'+i]={id:'demo-'+i,symbol:d.sym,displaySymbol:d.disp,side:'LONG',bot:'RISK',size:120,entry,price,pnlBase:entry,
-      h1:d.h1,h6:d.h6,mcap:d.m,pass:d.pass,tiers:1,openedAt:now-(i+1)*600000,st:d.st};
+      h1:d.h1,h6:d.h6,mcap:d.m,pass:d.pass,tiers:1,peakPct:d.peakPct,steps:d.steps||null,openedAt:now-(i+1)*600000};
   });
   posEventsCache=[
     {ts:now-3600000,action:'OPEN',token:'CZ',displaySymbol:'CZ',usd:120,price:0.00034,pct:null,net:null},
@@ -1024,6 +1042,7 @@ async function pullPositions(){
 }
 setTimeout(pullPositions, 1500);
 window.AO={
+  stDisplay,
   demoFx(ev){onFx(Object.assign({ts:Date.now()}, ev||{}));},
   replay(){shownId=''; shownData=''; posBoot=true; portBoot=true; posVis=''; portVis=''; posSnap=null; portSnap=null; syncScan(true); syncPos(true); syncPort(true);},
   unlock(){audio.setMuted(false); return audio.unlock().then(paintAudio);},
