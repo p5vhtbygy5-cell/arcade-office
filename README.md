@@ -41,8 +41,12 @@ Sterowanie: strzałki / WASD – ruch, Enter – czat, Esc – powrót do gry. Z
 - `deskfx.js` – efekty etapów i zamknięć oraz obcięcie wiersza sędziego do `wybor: TOKEN`
 - `public/map.js` – mapa biura
 - `public/index.html`, `public/game.js`, `public/flap.js`, `public/office.js`, `public/audio.js` – scena, split-flap, biuro, dźwięk
+- `public/v2/` – osobna tablica dashboardowa (`GET /v2`), ten sam feed `/api/feed`
 - `render.yaml` – konfiguracja Render (Blueprint)
 - `test.js`, `screenshot.js` – skrypty weryfikacyjne
+
+## Tablica v2 (`/v2`)
+Osobny front (steampunk dashboard, nie gra). Stara strona `/` zostaje bez zmian. Dane z tych samych odczytów: `GET /api/feed`, `/api/positions`, `/api/portfolio`, `/api/scan`, `/api/ticker`, `/api/bot-events` oraz Socket.IO. `?demo=1` albo `?fixture=1` wstawia lokalny zestaw fixture (oznaczony na ekranie). `?badge=fixture` tylko pokazuje plakietkę, bez podmiany danych.
 
 ## Wdrożenie publiczne
 Potrzebny hosting z trwałym procesem i WebSocketami (nie serverless typu Vercel/Netlify Functions).
@@ -94,7 +98,7 @@ Pełny stan desku (pozycje REAL/SHADOW, aktywność botów, opcjonalnie top10) �
 Trzy duże ekrany (mosiądz/nixie): **Top 10 desk + ostatnie pozycje** (lewy), **Tablica Pozycji** (środek), **Historia portfela** (prawy).
 Historia portfela pochodzi z feedu: opcjonalne pole `portfolio` w `POST /api/feed` (budowane przez `sync-feed.js` z `/workspace/desk/trades.jsonl` i `state.json`, tylko odczyt).
 Odczyt: `GET /api/portfolio`, Socket.IO `portfolio`. Bez historii ekran pokazuje "BRAK HISTORII" – nigdy wymyślonych liczb.
-Pola: `start, bank, realizedPnl, roiPct, trades, partial, wins, winRate, maxDrawdownPct, maxDrawdownUsd, best, worst, series[{ts,bank}], recent[{ts,kind:open|close,token,net,pct,size,partial,runner,mode}], mode, updatedAt`.
+Pola: `start, bank, realizedPnl, roiPct, trades, partial, wins, winRate, maxDrawdownPct, maxDrawdownUsd, fees (opcjonalne), best, worst, series[{ts,bank}], recent[{ts,kind:open|close,token,net,pct,size,partial,runner,mode}], mode, updatedAt`. `/v2` czyta też opcjonalne `positions[].h24`/`change24h`, `positions[].steps`, `positions[].image`.
 `sync-feed.js`: `FEED_ONLY=local` + `LOCAL_FEED_URL=...` wysyła tylko do lokalnego serwera (np. :3100); domyślnie bez zmian.
 
 ## Pasek wiadomości (ticker) i dymki czatu
