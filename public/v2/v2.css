@@ -6,8 +6,7 @@
   --flap:"Barlow Condensed","Chakra Petch",sans-serif;
   --nixie:"Share Tech Mono","Chakra Petch",monospace;
   --title:"Cinzel","Barlow Condensed",serif;
-  --bg-tile:image-set(url("/v2/assets/bg-tile.webp") 1x,url("/v2/assets/bg-tile@2x.webp") 2x);
-  --bg-narrow:url("/v2/assets/bg-tile-narrow.webp");
+  --bg-tile:image-set(url("/v2/assets/bg-mahogany.webp") type("image/webp") 1x,url("/v2/assets/bg-mahogany.png") type("image/png") 1x,url("/v2/assets/bg-mahogany@2x.webp") type("image/webp") 2x,url("/v2/assets/bg-mahogany@2x.png") type("image/png") 2x);
   --frame:image-set(url("/v2/assets/frame-panel.webp") 1x,url("/v2/assets/frame-panel@2x.webp") 2x);
   --clock:image-set(url("/v2/assets/clock-face.webp") 1x,url("/v2/assets/clock-face@2x.webp") 2x);
   --gauge:image-set(url("/v2/assets/gauge-face.webp") 1x,url("/v2/assets/gauge-face@2x.webp") 2x);
@@ -24,7 +23,7 @@
   --bot-risk:image-set(url("/v2/assets/icon-risk.webp") 1x,url("/v2/assets/icon-risk@2x.webp") 2x);
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:#0a0806;color:var(--ink);font-family:var(--ui);overflow:hidden}
+html,body{margin:0;height:100%;background-color:#1e1510;background-image:url("/v2/assets/bg-mahogany.png");background-image:var(--bg-tile);background-repeat:repeat;color:var(--ink);font-family:var(--ui);overflow:hidden}
 button,input{font-family:inherit;color:var(--ink)}
 button{background:linear-gradient(180deg,#2a2218,#1a1410);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:16px;font-weight:600;letter-spacing:.06em;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,240,210,.12)}
 button:hover{border-color:var(--brass);color:var(--cream)}
@@ -33,18 +32,21 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
 #go{background:linear-gradient(180deg,#d4a84b,#8a6520);color:#1a1008;border:1px solid #e8c86a;font-weight:700}
 #msg{flex:1;background:#0f0c09;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:15px}
 
-#fit{position:fixed;inset:0;background:#0a0806}
+#fit{position:fixed;inset:0;background-color:#1e1510;background-image:url("/v2/assets/bg-mahogany.png");background-image:var(--bg-tile);background-repeat:repeat}
 #board{
   position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;
   display:grid;
   grid-template-rows:52px 208px minmax(0,1fr) 136px minmax(252px,270px) 34px;
   grid-template-columns:1fr;
   gap:8px;padding:10px 16px 8px;
-  background-color:#140e0a;
+  background-color:#1e1510;
+  background-image:
+    radial-gradient(ellipse 90% 70% at 50% -8%,rgba(80,50,20,.35),transparent 55%),
+    url("/v2/assets/bg-mahogany.png");
   background-image:
     radial-gradient(ellipse 90% 70% at 50% -8%,rgba(80,50,20,.35),transparent 55%),
     var(--bg-tile);
-  background-size:auto,256px 256px;
+  background-repeat:no-repeat,repeat;
   overflow:hidden;
 }
 .gears{position:absolute;inset:0;pointer-events:none;z-index:2;grid-area:1 / 1 / -1 / -1}
@@ -263,7 +265,6 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
 
 @media (max-width:900px){
   :root{
-    --bg-tile:var(--bg-narrow);
     --clock:url("/v2/assets/clock-face-96.webp");
     --gauge:url("/v2/assets/gauge-face-96.webp");
     --nixie-img:url("/v2/assets/nixie-tube-96.webp");
@@ -284,7 +285,6 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
   #board{
     position:relative;width:100%;height:auto;min-height:100dvh;transform:none!important;
     display:flex;flex-direction:column;gap:10px;padding:8px 8px 12px;
-    background-size:auto,128px auto;
   }
   .gear{width:56px!important;opacity:.7}
   .g-cl,.g-cr{display:none}
