@@ -162,7 +162,13 @@ function setGauge(id, name, digital, min, max, needle){
   const el=$(id); if(!el) return;
   const nm=el.querySelector('.ao-gname'), dv=el.querySelector('.ao-gval');
   if(nm) nm.textContent=name;
-  if(dv) dv.textContent=digital==null?'—':String(digital);
+  if(dv){
+    const t=digital==null?'—':String(digital);
+    dv.textContent=t;
+    dv.classList.remove('pos','neg');
+    if(t.charAt(0)==='+') dv.classList.add('pos');
+    else if(t.charAt(0)==='−'||t.charAt(0)==='-') dv.classList.add('neg');
+  }
   setNeedle(el, min, max, needle);
 }
 
