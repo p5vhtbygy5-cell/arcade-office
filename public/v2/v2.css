@@ -302,10 +302,14 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
 .kv b.pos{color:var(--good-hi)}.kv b.neg{color:var(--bad-hi)}
 #portChart{width:100%;height:100%;min-height:0;display:block;background:rgba(0,0,0,.25);border:1px solid rgba(201,162,39,.2);border-radius:6px}
 #log,#plist{
-  flex:1;overflow:hidden;margin:0 10px 4px;padding:4px 8px;font-size:12.5px;line-height:1.22;
+  flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;margin:0 10px 4px;padding:4px 8px;font-size:12.5px;line-height:1.22;
   border:1.5px solid rgba(160,110,40,.4);border-radius:6px;background:linear-gradient(180deg,#16110c,#0e0b08);
   font-variant-numeric:tabular-nums;
+  scrollbar-width:thin;scrollbar-color:#b87333 #140e0a;
 }
+#log::-webkit-scrollbar,#plist::-webkit-scrollbar{width:8px}
+#log::-webkit-scrollbar-track,#plist::-webkit-scrollbar-track{background:#140e0a}
+#log::-webkit-scrollbar-thumb,#plist::-webkit-scrollbar-thumb{background:#b87333;border-radius:4px}
 #log>div,#plist>div{margin:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #log .sys{color:var(--cream)}
 #log .tag{color:var(--copper)}

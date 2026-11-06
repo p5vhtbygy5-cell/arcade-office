@@ -455,18 +455,22 @@ function formatAct(a){
   const time=tm||(a.ts?new Date(a.ts).toLocaleTimeString('pl-PL',{timeZone:TZ,hour:'2-digit',minute:'2-digit'})+' ':'');
   return {bot:a.bot, time, text:bt, ts:a.ts};
 }
+function tsOf(v){
+  const n=typeof v==='number'?v:Date.parse(v);
+  return Number.isFinite(n)?n:0;
+}
 function chatLines(){
   const extra=[];
   for(const bot of Object.keys(botEvents||{})){
     for(const ev of botEvents[bot]||[]) extra.push({ts:ev.ts, bot, text:ev.text, kind:'botEvent'});
   }
-  const all=chatHist.concat(extra).sort((a,b)=>(Date.parse(a.ts)||0)-(Date.parse(b.ts)||0));
+  const all=chatHist.concat(extra).sort((a,b)=>tsOf(a.ts)-tsOf(b.ts));
   const seen=new Set(), out=[];
   for(const a of all){
     const k=(a.bot||'')+'|'+(String(a.text||'').replace(/^\d\d:\d\d /,''));
     if(seen.has(k)) continue; seen.add(k); out.push(a);
   }
-  return out.slice(-18);
+  return out.slice(-80);
 }
 function renderChat(){
   const lines=chatLines();
@@ -474,18 +478,22 @@ function renderChat(){
   if(sig===lastChatSig) return;
   lastChatSig=sig;
   const el=$('log');
+  const follow=el.scrollHeight-el.scrollTop-el.clientHeight<=8;
+  const keep=el.scrollTop;
   el.innerHTML=lines.map(a=>{
     const f=formatAct(a);
     return '<div class="sys"><span class="tag">'+esc(f.time)+'</span><b>'+esc(a.bot||a.name||'')+'</b>: '+esc(f.text)+'</div>';
   }).join('')||'<div class="sys">brak wpisów</div>';
-  el.scrollTop=el.scrollHeight;
+  el.scrollTop=follow?el.scrollHeight:keep;
 }
 function renderEvents(){
-  const evs=posEvents.slice(0,14);
+  const evs=posEvents.slice(0,50);
   const sig=evs.map(e=>e.ts+'|'+e.action+'|'+e.token+'|'+e.net).join('|');
   if(sig===lastEvSig) return;
   lastEvSig=sig;
   const el=$('plist');
+  const atTop=el.scrollTop<=8;
+  const keep=el.scrollTop, prevH=el.scrollHeight;
   if(!evs.length){el.innerHTML='<div class="b">brak zdarzeń pozycji</div>'; return;}
   const sg=v=>(v>=0?'+':'')+v;
   el.innerHTML=evs.map(e=>{
@@ -501,6 +509,7 @@ function renderEvents(){
     }
     return '<div class="'+cls+'">'+esc(t)+'</div>';
   }).join('');
+  el.scrollTop=atTop?0:keep+Math.max(0,el.scrollHeight-prevH);
 }
 
 function newsParts(){
