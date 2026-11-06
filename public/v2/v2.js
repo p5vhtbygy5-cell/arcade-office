@@ -2,7 +2,6 @@
 (function(){
 const TZ='Europe/Warsaw';
 const POS_LIMIT=10;
-const TRAIL_PCT=19;
 const STEP_ROMAN=['0','I','II','III','IV','V','VI'];
 const STAGE_NAME=['0','I','II','III','IV'];
 const SEATS=['SCAN','VET','BOOK','SIZE','FILLS','RISK'];
@@ -16,6 +15,7 @@ const badgeOn=fixtureOn||/\bbadge=fixture\b/.test(location.search);
 let me=null, players={}, positions={}, portfolio=null, ticker=null, scan=null;
 let botEvents={}, feedAt=0, posEvents=[], chatHist=[], joined=false, myName='';
 let fixture=false, lastPosSig='', lastPortSig='', lastPipeSig='', lastChatSig='', lastEvSig='', lastTickSig='';
+let statsReady=false;
 
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function num(v){const n=+v;return Number.isFinite(n)?n:null;}
@@ -122,74 +122,271 @@ function paintClock(now){
   }).join('');
 })();
 
-function gaugeSvg(bipolar){
-  const ticks=[];
-  for(let i=0;i<=10;i++){
-    const t=i/10, ang=Math.PI*(1+t);
-    const x1=50+Math.cos(ang)*34, y1=62+Math.sin(ang)*34;
-    const x2=50+Math.cos(ang)*(i%5===0?28:30.5), y2=62+Math.sin(ang)*(i%5===0?28:30.5);
-    ticks.push('<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#5a4030" stroke-width="'+(i%5===0?1.4:0.8)+'"/>');
+/* Brass manometers.
+   Needle sweep is ±110° from straight up (asset rest pose = 0°).
+   Missing values stay at rest (0°, no jitter) and read "—".
+   Scale for count/$/% auto-range (POZYCJE fixed 0..10, WIN % fixed 0..100):
+   half-span / max is the smallest nice number in {1, 2, 2.5, 4, 5, 8}×10^k
+   that is at least max(10, |value|/0.8), so the needle sits at most at 80%.
+   TRANSAKCJE is today's OPEN+CLOSE count (Europe/Warsaw), same count the
+   previous dial showed — not portfolio.trades (that stays on PORTFEL → TRADES).
+   PNL DNIA sums today's CLOSE net ($). WIN % / ROI / PROWIZJE come from portfolio. */
+const MANO_V='?v=7';
+const MANO_ARC=110;
+const GAUGE_DEF=[
+  {id:'pos', label:'POZYCJE', signed:false},
+  {id:'pnl', label:'PNL DNIA', signed:true},
+  {id:'win', label:'WIN %', signed:false},
+  {id:'roi', label:'ROI', signed:true},
+  {id:'tx', label:'TRANSAKCJE', signed:false},
+  {id:'fees', label:'PROWIZJE', signed:false}
+];
+const TRAINS={
+  endL:[
+    {s:52,x:-10,y:2,spin:'cw-xslow',plane:'far'},
+    {s:40,x:24,y:18,spin:'ccw-slow',plane:'far'},
+    {s:32,x:0,y:78,spin:'cw-slow',plane:'far'},
+    {s:26,x:36,y:70,spin:'ccw-xslow',plane:'far'},
+    {s:42,x:10,y:-4,spin:'ccw-slow',plane:'mid'},
+    {s:32,x:-4,y:46,spin:'cw',plane:'mid'},
+    {s:36,x:22,y:44,spin:'cw',plane:'front'},
+    {s:26,x:2,y:68,spin:'ccw-fast',plane:'front'},
+    {s:20,x:34,y:82,spin:'cw-fast',plane:'front'}
+  ],
+  mid:[
+    {s:44,x:-8,y:4,spin:'ccw-xslow',plane:'far'},
+    {s:34,x:24,y:28,spin:'cw-slow',plane:'far'},
+    {s:26,x:-2,y:78,spin:'ccw-slow',plane:'far'},
+    {s:22,x:30,y:72,spin:'cw-xslow',plane:'far'},
+    {s:36,x:8,y:16,spin:'cw',plane:'mid'},
+    {s:30,x:-4,y:50,spin:'ccw-fast',plane:'front'},
+    {s:24,x:26,y:58,spin:'cw-fast',plane:'front'},
+    {s:26,x:12,y:84,spin:'ccw',plane:'front'}
+  ],
+  midB:[
+    {s:46,x:-4,y:0,spin:'cw-xslow',plane:'far'},
+    {s:32,x:28,y:24,spin:'ccw-slow',plane:'far'},
+    {s:30,x:-8,y:64,spin:'cw-slow',plane:'far'},
+    {s:22,x:32,y:78,spin:'ccw-xslow',plane:'far'},
+    {s:38,x:12,y:20,spin:'ccw',plane:'mid'},
+    {s:30,x:0,y:50,spin:'cw',plane:'front'},
+    {s:22,x:28,y:64,spin:'ccw-fast',plane:'front'},
+    {s:24,x:6,y:86,spin:'cw-fast',plane:'front'}
+  ],
+  endR:[
+    {s:52,x:22,y:2,spin:'ccw-xslow',plane:'far'},
+    {s:40,x:-6,y:20,spin:'cw-slow',plane:'far'},
+    {s:32,x:30,y:78,spin:'ccw-slow',plane:'far'},
+    {s:26,x:0,y:70,spin:'cw-xslow',plane:'far'},
+    {s:42,x:10,y:-4,spin:'cw-slow',plane:'mid'},
+    {s:32,x:30,y:46,spin:'ccw',plane:'mid'},
+    {s:36,x:2,y:42,spin:'ccw',plane:'front'},
+    {s:26,x:32,y:68,spin:'cw-fast',plane:'front'},
+    {s:20,x:6,y:84,spin:'ccw-fast',plane:'front'}
+  ],
+  mini:[
+    {s:26,x:-2,y:0,spin:'cw-slow',plane:'far'},
+    {s:22,x:10,y:12,spin:'ccw',plane:'front'},
+    {s:16,x:0,y:26,spin:'cw-fast',plane:'front'},
+    {s:18,x:14,y:28,spin:'ccw-fast',plane:'mid'}
+  ]
+};
+const needleState=new Map();
+const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+let needleLoopOn=false;
+
+function needleSpan(abs){
+  const need=Math.max(10, Math.abs(+abs||0)/0.8);
+  const pow=Math.pow(10, Math.floor(Math.log10(need)));
+  const mant=need/pow;
+  const nice=mant<=1?1:mant<=2?2:mant<=2.5?2.5:mant<=4?4:mant<=5?5:mant<=8?8:10;
+  return nice*pow;
+}
+function manoAsset(name, hi){
+  return '/v2/assets/manometer/'+name+(hi?'@2x':'')+'.webp'+MANO_V;
+}
+function partImg(name, cls){
+  return '<img class="'+cls+'" alt="" draggable="false" decoding="async" src="'+manoAsset(name)+'" srcset="'+manoAsset(name)+' 1x, '+manoAsset(name,true)+' 2x">';
+}
+function gearImg(plane, px, spin, phase){
+  const bucket=px>=46?'lg':px>=32?'md':'sm';
+  const name=(plane==='far'?'gear-far-':'gear-front-')+bucket;
+  const src=manoAsset(name+'-96');
+  const src2=manoAsset(name);
+  return '<img class="mg '+plane+' mg-'+spin+'" alt="" draggable="false" decoding="async" src="'+src+'" srcset="'+src+' 1x, '+src2+' 2x" style="animation-delay:-'+phase.toFixed(2)+'s">';
+}
+function trainBox(variant){
+  if(variant==='endL'||variant==='endR') return {w:72,h:130};
+  if(variant==='mini') return {w:34,h:48};
+  return {w:58,h:130};
+}
+function gearsHTML(key, variant){
+  const box=trainBox(variant);
+  return (TRAINS[variant]||TRAINS.mid).map((it,i)=>{
+    const left=(it.x/box.w*100).toFixed(2);
+    const top=(it.y/box.h*100).toFixed(2);
+    const w=(it.s/box.w*100).toFixed(2);
+    const h=(it.s/box.h*100).toFixed(2);
+    const phase=((i+1)*0.73+(key.length%5)*0.4)%9;
+    return gearImg(it.plane, it.s, it.spin, phase).replace('style="','style="left:'+left+'%;top:'+top+'%;width:'+w+'%;height:'+h+'%;');
+  }).join('');
+}
+function trainHTML(key, variant){
+  const end=variant==='endL'||variant==='endR';
+  return '<div class="train'+(end?' end':'')+'" aria-hidden="true">'+gearsHTML(key,variant)+'</div>';
+}
+function tickText(val, signed){
+  let n=Math.round(val);
+  if(!n) n=0;
+  const neg=n<0, a=Math.abs(n);
+  let body;
+  if(a>=1000){
+    const k=a/1000;
+    body=(a%1000?k.toFixed(1):k.toFixed(0))+'k';
+  }else body=String(a);
+  return (neg?'−':(signed&&n>0?'+':''))+body;
+}
+function ticksInner(min, max, signed){
+  const majors=5, C=128, k=256/208;
+  let out='';
+  for(let i=0;i<=majors;i++){
+    const t=i/majors;
+    const ang=(-MANO_ARC+t*(2*MANO_ARC))*Math.PI/180;
+    const x=r=> (C+r*Math.sin(ang)).toFixed(2);
+    const y=r=> (C-r*Math.cos(ang)).toFixed(2);
+    out+='<line x1="'+x(70*k)+'" y1="'+y(70*k)+'" x2="'+x(82*k)+'" y2="'+y(82*k)+'" stroke="#e8dcc4" stroke-width="2.2" stroke-linecap="round"/>';
+    if(i<majors){
+      for(let j=1;j<4;j++){
+        const t2=(i+j/4)/majors;
+        const ang2=(-MANO_ARC+t2*(2*MANO_ARC))*Math.PI/180;
+        const mx=r=>(C+r*Math.sin(ang2)).toFixed(2);
+        const my=r=>(C-r*Math.cos(ang2)).toFixed(2);
+        out+='<line x1="'+mx(74*k)+'" y1="'+my(74*k)+'" x2="'+mx(82*k)+'" y2="'+my(82*k)+'" stroke="#8a7a62" stroke-width="1.2" stroke-linecap="round"/>';
+      }
+    }
+    const val=min+t*(max-min);
+    out+='<text x="'+x(54*k)+'" y="'+(parseFloat(y(54*k))+4).toFixed(2)+'" text-anchor="middle" fill="#c8b898" font-size="13" font-family="Barlow Condensed,sans-serif" font-weight="700">'+tickText(val,signed)+'</text>';
   }
-  const zones=bipolar
-    ? '<path d="M16 62 A34 34 0 0 1 50 28" fill="none" stroke="#9a3a3a" stroke-width="5" stroke-linecap="butt"/>'+
-      '<path d="M50 28 A34 34 0 0 1 84 62" fill="none" stroke="#3a7a48" stroke-width="5" stroke-linecap="butt"/>'+
-      '<text x="18" y="74" fill="#8a3030" font-size="7" font-family="Barlow Condensed,sans-serif" font-weight="700">−100</text>'+
-      '<text x="47" y="22" fill="#3a2818" font-size="7" font-family="Barlow Condensed,sans-serif" font-weight="700">0</text>'+
-      '<text x="70" y="74" fill="#2d6a3a" font-size="7" font-family="Barlow Condensed,sans-serif" font-weight="700">+100</text>'
-    : '';
-  return '<svg viewBox="0 0 100 78" aria-hidden="true">'+zones+ticks.join('')+
-    '<line class="ao-needle" x1="50" y1="62" x2="50" y2="32"/>'+
-    '<circle cx="50" cy="62" r="3.4" fill="#3a2410" stroke="#c9a227" stroke-width="1"/>'+
-    '</svg>';
+  return out;
+}
+function satImg(kind, place, spin, phase){
+  const px=place==='L'||place==='R'?36:place==='L2'||place==='R2'?22:28;
+  const plane=kind==='far'?'far':'front';
+  return gearImg(plane, px, spin, phase).replace('class="mg ','class="sat '+place+' ');
+}
+function unitHTML(g){
+  const signed=g.signed?1:0;
+  const sc=g.id==='win'?{min:0,max:100}:g.id==='pos'?{min:0,max:POS_LIMIT}:g.signed?{min:-10,max:10}:{min:0,max:10};
+  return '<div class="mano" data-id="'+g.id+'" data-signed="'+signed+'" role="img" aria-label="'+g.label+' —">'+
+    satImg('far','Lf','ccw-xslow',1.1)+satImg('far','Rf','cw-xslow',2.4)+
+    '<div class="dial">'+
+      partImg('gauge-face','layer face')+
+      '<svg class="layer ticks" viewBox="0 0 256 256" aria-hidden="true">'+ticksInner(sc.min,sc.max,g.signed)+'</svg>'+
+      partImg('gauge-bezel','layer bezel')+
+      partImg('gauge-needle','layer needle')+
+      '<div class="layer face-val val">—</div>'+
+    '</div>'+
+    satImg('front','L','cw-fast',0.4)+satImg('front','R','ccw-fast',1.7)+
+    satImg('front','L2','ccw',2.2)+satImg('front','R2','cw',0.9)+
+    '<div class="mano-plaque">'+partImg('gauge-plaque','plate')+
+      '<div class="txt"><div class="lbl">'+g.label+'</div><div class="val">—</div></div></div></div>';
 }
 function mountGauges(){
-  document.querySelectorAll('.ao-gauge').forEach(el=>{
-    const bipolar=el.classList.contains('bipolar');
-    el.innerHTML='<div class="g-face">'+gaugeSvg(bipolar)+'</div><div class="ao-plate"><div class="ao-gname"></div><div class="ao-gval">—</div></div>';
+  const root=$('gauges'); if(!root) return;
+  const variants=['mid','midB','mid','midB','mid'];
+  let html=trainHTML('T0','endL');
+  GAUGE_DEF.forEach((g,i)=>{
+    let mini='';
+    if(i%3!==2) mini+= '<div class="mini-train mt-br" aria-hidden="true">'+gearsHTML('m'+i+'r','mini')+'</div>';
+    if(i%3===0) mini+= '<div class="mini-train mt-bl" aria-hidden="true">'+gearsHTML('m'+i+'l','mini')+'</div>';
+    html+='<div class="mano-cell">'+unitHTML(g)+mini+'</div>';
+    if(i<GAUGE_DEF.length-1) html+=trainHTML('T'+(i+1), variants[i]);
+  });
+  html+=trainHTML('T6','endR');
+  root.innerHTML=html;
+  root.querySelectorAll('.needle').forEach(el=>{
+    needleState.set(el,{goal:0,base:0,off:0,target:0,next:performance.now()+180+Math.random()*700,live:false});
+  });
+  ensureNeedleLoop();
+}
+function setMano(id, text, tone, min, max, value){
+  const el=document.querySelector('#gauges .mano[data-id="'+id+'"]'); if(!el) return;
+  const live=value!=null&&Number.isFinite(+value);
+  const sig=text+'|'+tone+'|'+min+'|'+max+'|'+(live?1:0);
+  if(el.dataset.sig!==sig){
+    el.dataset.sig=sig;
+    el.querySelectorAll('.val').forEach(n=>{
+      n.textContent=text;
+      n.classList.remove('pos','neg');
+      if(tone) n.classList.add(tone);
+    });
+    const lbl=el.querySelector('.lbl');
+    el.setAttribute('aria-label',(lbl?lbl.textContent:id)+' '+text);
+    const sk=min+'|'+max;
+    if(el.dataset.scale!==sk){
+      el.dataset.scale=sk;
+      const svg=el.querySelector('.ticks');
+      if(svg) svg.innerHTML=ticksInner(min,max,el.dataset.signed==='1');
+    }
+  }
+  const st=needleState.get(el.querySelector('.needle'));
+  if(!st) return;
+  if(live){
+    const t=Math.max(0, Math.min(1, (+value-min)/((max-min)||1)));
+    st.goal=-MANO_ARC+t*(2*MANO_ARC);
+    st.live=true;
+  }else{
+    st.goal=0;
+    st.live=false;
+  }
+}
+function stepNeedles(now){
+  const reduce=reduceMotion.matches;
+  needleState.forEach(s=>{
+    const el=s.el;
+    if(!el) return;
+    if(reduce){
+      s.base=s.goal; s.off=0; s.target=0; s.holdUntil=0;
+    }else{
+      s.base+=(s.goal-s.base)*0.12;
+      if(!s.live){ s.target=0; s.holdUntil=0; }
+      else if(now>=s.next){
+        // Irregular analog flick: mostly ±0.45..1.2°, sometimes ±1.35..2°, then settle.
+        // Not a fixed-amplitude sine — new random sign, size, and gap each time.
+        const strong=Math.random()<0.18;
+        const amp=strong?(1.35+Math.random()*0.65):(0.45+Math.random()*0.75);
+        s.target=(Math.random()*2-1)*amp;
+        s.holdUntil=now+(strong?110:55)+Math.random()*80;
+        s.next=now+140+Math.random()*760;
+      }
+      if(s.holdUntil && now<s.holdUntil) s.off+=(s.target-s.off)*0.42;
+      else{ s.target*=0.86; s.off+=(s.target-s.off)*0.22; }
+    }
+    el.style.transform='rotate('+((s.base+s.off).toFixed(3))+'deg)';
   });
 }
+function needleFrame(now){
+  needleLoopOn=true;
+  stepNeedles(now);
+  if(document.hidden){needleLoopOn=false;return;}
+  requestAnimationFrame(needleFrame);
+}
+function ensureNeedleLoop(){ if(!needleLoopOn && !document.hidden) requestAnimationFrame(needleFrame); }
+document.addEventListener('visibilitychange', ensureNeedleLoop);
+reduceMotion.addEventListener&&reduceMotion.addEventListener('change', ()=>stepNeedles(performance.now()));
 mountGauges();
-function setNeedle(el, min, max, val){
-  const n=el.querySelector('.ao-needle'); if(!n) return;
-  const v=val==null||!Number.isFinite(+val)?min:Math.max(min, Math.min(max, +val));
-  const t=(v-min)/(max-min||1);
-  const ang=Math.PI*(1+t);
-  n.setAttribute('x1',50); n.setAttribute('y1',62);
-  n.setAttribute('x2',(50+Math.cos(ang)*30).toFixed(2));
-  n.setAttribute('y2',(62+Math.sin(ang)*30).toFixed(2));
-}
-function setGauge(id, name, digital, min, max, needle){
-  const el=$(id); if(!el) return;
-  const nm=el.querySelector('.ao-gname'), dv=el.querySelector('.ao-gval');
-  if(nm) nm.textContent=name;
-  if(dv){
-    const t=digital==null?'—':String(digital);
-    dv.textContent=t;
-    dv.classList.remove('pos','neg');
-    if(t.charAt(0)==='+') dv.classList.add('pos');
-    else if(t.charAt(0)==='−'||t.charAt(0)==='-') dv.classList.add('neg');
-  }
-  setNeedle(el, min, max, needle);
-}
+needleState.forEach((s,el)=>{s.el=el;});
 
 function dayStats(evs){
   const day=warsawDayKey(Date.now());
-  let pnl=0, hasPnl=false, trades=0, wins=0, losses=0;
+  let pnl=0, hasPnl=false, trades=0;
   for(const e of evs||[]){
     if(!e||!e.ts) continue;
     if(warsawDayKey(e.ts)!==day) continue;
     if(e.action==='OPEN'||e.action==='CLOSE') trades++;
-    if(e.action==='CLOSE'){
-      const net=e.net!=null?+e.net:(e.pct!=null?+e.pct:null);
-      if(net!=null&&Number.isFinite(net)){
-        if(e.net!=null){pnl+=+e.net; hasPnl=true;}
-        if(net>0) wins++; else if(net<0) losses++;
-      }
-    }
+    if(e.action==='CLOSE' && e.net!=null && Number.isFinite(+e.net)){pnl+=+e.net; hasPnl=true;}
   }
-  const decided=wins+losses;
-  const balance=decided?((wins-losses)/decided)*100:0;
-  return {pnl:hasPnl?pnl:null, trades:trades||null, wins, losses, balance:decided?balance:null};
+  return {pnl:hasPnl?pnl:null, trades};
 }
 
 function passHtml(pass){
@@ -392,15 +589,28 @@ function renderPipeline(){
 
 function renderGauges(){
   const open=Object.keys(positions).length;
-  setGauge('gaugePosOpen','POZYCJE', open+'/'+POS_LIMIT, 0, POS_LIMIT, open);
-  setGauge('gaugeTrail','TRAIL', TRAIL_PCT+'%', 0, 100, TRAIL_PCT);
+  setMano('pos', open+' / '+POS_LIMIT, '', 0, POS_LIMIT, open);
   const ds=dayStats(posEvents);
-  setGauge('gaugeDayPnl','PNL DNIA', ds.pnl==null?'—':fmtMoney(ds.pnl,true), -100, 100, ds.pnl);
-  // Needle: day's win/loss count balance mapped to −100…+100.
-  // Digital: same trade count the current board uses (today's OPEN+CLOSE).
-  setGauge('gaugeDayTrades','TRANSAKCJE', ds.trades==null?'—':String(ds.trades), -100, 100, ds.balance==null?0:ds.balance);
-  const fees=portfolio&&(portfolio.fees!=null?portfolio.fees:portfolio.feesUsd);
-  setGauge('gaugeFees','PROWIZJE', fees==null?'—':fmtMoney(fees,false), 0, Math.max(10, fees||0), fees);
+  if(!statsReady){
+    setMano('pnl','—','',-10,10,null);
+    setMano('tx','—','',0,10,null);
+  }else{
+    const pnl=ds.pnl;
+    const ps=pnl==null?10:needleSpan(pnl);
+    setMano('pnl', pnl==null?'—':fmtMoney(pnl,true), pnl==null?'':(pnl>0?'pos':pnl<0?'neg':''), -ps, ps, pnl);
+    const txMax=needleSpan(ds.trades);
+    setMano('tx', String(ds.trades), '', 0, txMax, ds.trades);
+  }
+  const pf=portfolio;
+  const win=pf&&Number.isFinite(+pf.winRate)?+pf.winRate:null;
+  setMano('win', win==null?'—':Math.round(win)+'%', '', 0, 100, win);
+  const roi=pf&&Number.isFinite(+pf.roiPct)?+pf.roiPct:null;
+  const rs=roi==null?10:needleSpan(roi);
+  setMano('roi', roi==null?'—':fmtPct(roi), roi==null?'':(roi>0?'pos':roi<0?'neg':''), -rs, rs, roi);
+  const feeRaw=pf&&(pf.fees!=null?pf.fees:pf.feesUsd);
+  const fees=feeRaw!=null&&Number.isFinite(+feeRaw)?+feeRaw:null;
+  const fs=fees==null?10:needleSpan(fees);
+  setMano('fees', fees==null?'—':fmtMoney(fees,false), '', 0, fs, fees);
 }
 
 function toneClass(v){return v==null||!Number.isFinite(+v)?'':(+v>0?'pos':+v<0?'neg':'');}
@@ -596,7 +806,7 @@ socket.on('positionClosed', id=>{delete positions[id]; lastPosSig=''; lastPipeSi
 socket.on('portfolio', d=>{if(d&&typeof d==='object'&&!d.empty){portfolio=d; feedAt=Date.now(); lastPortSig=''; renderPort(); renderGauges();}});
 socket.on('ticker', d=>{if(d&&typeof d==='object'){ticker=d; lastTickSig=''; renderTicker();}});
 socket.on('scan', d=>{if(d&&typeof d==='object'){scan=d; if(d.lastFeedAt) feedAt=d.lastFeedAt; lastPipeSig=''; renderPipeline(); renderGauges();}});
-socket.on('posEvents', evs=>{posEvents=Array.isArray(evs)?evs:[]; lastEvSig=''; renderEvents(); renderGauges();});
+socket.on('posEvents', evs=>{posEvents=Array.isArray(evs)?evs:[]; statsReady=true; lastEvSig=''; renderEvents(); renderGauges();});
 socket.on('deskFx', ev=>{
   if(!audio||!ev) return;
   if(ev.kind==='stage') audio.stage(ev.level);
@@ -655,6 +865,7 @@ async function loadHistory(){
     if(sc&&sc.tokens) scan=sc;
     if(bev&&typeof bev==='object') botEvents=bev;
     if((!Object.keys(positions).length)&&Array.isArray(pos)&&pos.length) takePositions(pos);
+    statsReady=true;
   }catch(e){console.log('history', e.message);}
   lastChatSig=lastEvSig=lastPipeSig='';
   renderAll();
@@ -666,6 +877,7 @@ function showFixtureBadge(){
 function applyFixture(){
   if(!fixtureOn) return;
   fixture=true;
+  statsReady=true;
   showFixtureBadge();
   const now=Date.now();
   feedAt=now-18;
@@ -755,5 +967,11 @@ setInterval(()=>{
   if(scan&&scan.tokens&&scan.tokens.length){ /* rotate with server index if present */ renderPipeline(); }
 },1000);
 
-window.AO2={positions:()=>positions, portfolio:()=>portfolio, scan:()=>scan, fixture:()=>fixture, render:renderAll};
+window.AO2={positions:()=>positions, portfolio:()=>portfolio, scan:()=>scan, fixture:()=>fixture, render:renderAll,
+  gauges:()=>Array.from(document.querySelectorAll('#gauges .mano')).map(el=>{
+    const n=needleState.get(el.querySelector('.needle'));
+    const val=el.querySelector('.mano-plaque .val');
+    return {id:el.dataset.id, text:val?val.textContent:'', cls:val?val.className:'', scale:el.dataset.scale||'', goal:n?+n.goal.toFixed(2):null, live:!!(n&&n.live)};
+  })
+};
 })();
