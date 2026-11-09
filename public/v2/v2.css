@@ -299,26 +299,63 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
   font-size:calc(var(--mano) * 0.095);letter-spacing:.02em;
   color:#f2e6c8;text-shadow:0 1px 1px #000;font-variant-numeric:tabular-nums;
 }
+/* Variant A nameplate. One copper frame (groove, rivets, chamfer, bevel) for both
+   themes; only the plate fill and the label/value ink change. */
 .mano-plaque{
+  --mano-face-0:#2c1c14;
+  --mano-face-1:#1a100a;
+  --mano-face-2:#0e0805;
+  --mano-ink:#e8d4b0;
+  --mano-val:#f2e6c8;
+  --mano-pos:#70b268;
+  --mano-neg:#d06658;
   position:relative;z-index:5;
-  margin-top:calc(var(--mano) * -0.24);
-  width:calc(var(--mano) * 0.98);
-  aspect-ratio:384 / 176;
+  margin-top:calc(var(--mano) * -0.26);
+  width:calc(var(--mano) * 1.00);
+  aspect-ratio:auto;
+  height:auto;
+  min-height:calc(var(--mano) * 0.28);
   display:flex;align-items:center;justify-content:center;
-  filter:drop-shadow(0 2px 3px rgba(0,0,0,.7));
+  filter:drop-shadow(0 2px 2.5px rgba(0,0,0,.72));
 }
-.mano-plaque .plate{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
-.mano-plaque .txt{position:relative;z-index:1;text-align:center;line-height:1.05;padding:0 8%;max-width:100%}
+html[data-theme="light"] .mano-plaque{
+  --mano-face-0:#E8AF7C;
+  --mano-face-1:#DA9D6A;
+  --mano-face-2:#C48B60;
+  --mano-ink:#2a1c12;
+  --mano-val:#2a1c12;
+  --mano-pos:#1e6e2d;
+  --mano-neg:#a02018;
+}
+.mano-plaque .frame-svg{
+  position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
+}
+.mano-plaque .txt{
+  position:relative;z-index:2;text-align:center;line-height:1.05;
+  padding:calc(var(--mano) * 0.055) calc(var(--mano) * 0.08) calc(var(--mano) * 0.048);
+  width:100%;max-width:100%;
+}
 .mano-plaque .lbl{
   font-family:var(--flap);font-weight:800;letter-spacing:.1em;text-transform:uppercase;
-  font-size:calc(var(--mano) * 0.078);color:#e8d4b0;text-shadow:0 1px 0 #000;white-space:nowrap;
+  font-size:calc(var(--mano) * 0.078);color:var(--mano-ink);text-shadow:0 1px 0 #000;white-space:nowrap;
 }
 .mano-plaque .val{
   font-family:var(--nixie);font-weight:700;font-size:calc(var(--mano) * 0.105);
-  color:#f2e6c8;text-shadow:0 1px 0 #000;font-variant-numeric:tabular-nums;white-space:nowrap;
+  color:var(--mano-val);text-shadow:0 1px 0 #000;font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+html[data-theme="light"] .mano-plaque .lbl,
+html[data-theme="light"] .mano-plaque .val{text-shadow:none}
+.mano-plaque::after{
+  content:"";position:absolute;z-index:3;pointer-events:none;
+  left:6%;right:6%;top:14%;height:38%;
+  background:linear-gradient(180deg,rgba(255,220,170,.14),rgba(255,200,140,.04) 55%,transparent);
+  clip-path:polygon(4px 0,calc(100% - 4px) 0,100% 4px,100% calc(100% - 2px),0 calc(100% - 2px),0 4px);
+  border-radius:1px;
 }
 #gauges .val.pos{color:#70b268}
 #gauges .val.neg{color:#d06658}
+#gauges .mano-plaque .val.pos{color:var(--mano-pos);background:transparent}
+#gauges .mano-plaque .val.neg{color:var(--mano-neg);background:transparent}
 .sat{
   position:absolute;z-index:3;pointer-events:none;object-fit:contain;
   transform-origin:50% 50%;filter:drop-shadow(0 1px 1px rgba(0,0,0,.65));

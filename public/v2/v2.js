@@ -274,6 +274,42 @@ function satImg(kind, place, spin, phase){
   const plane=kind==='far'?'far':'front';
   return gearImg(plane, px, spin, phase).replace('class="mg ','class="sat '+place+' ');
 }
+function plaqueFrame(id){
+  const g='mf'+id;
+  const riv=(x,y)=>'<circle cx="'+x+'" cy="'+y+'" r="2.55" fill="#3a2014" stroke="#1a0e08" stroke-width=".55"/>'+
+    '<circle cx="'+x+'" cy="'+y+'" r="1.85" fill="#6a3e28"/>'+
+    '<circle cx="'+x+'" cy="'+y+'" r="1.15" fill="#a87850"/>'+
+    '<circle cx="'+(x-.4)+'" cy="'+(y-.4)+'" r=".5" fill="#e0b888"/>';
+  return '<svg class="frame-svg" viewBox="0 0 200 72" preserveAspectRatio="none" aria-hidden="true">'+
+    '<defs>'+
+      '<linearGradient id="'+g+'Bevel" x1="0" y1="0" x2="1" y2="1">'+
+        '<stop offset="0%" stop-color="#9a6848"/>'+
+        '<stop offset="32%" stop-color="#5a3220"/>'+
+        '<stop offset="68%" stop-color="#2e1810"/>'+
+        '<stop offset="100%" stop-color="#1a0e08"/>'+
+      '</linearGradient>'+
+      '<linearGradient id="'+g+'Face" x1="0" y1="0" x2="0" y2="1">'+
+        '<stop offset="0%" stop-color="var(--mano-face-0)"/>'+
+        '<stop offset="48%" stop-color="var(--mano-face-1)"/>'+
+        '<stop offset="100%" stop-color="var(--mano-face-2)"/>'+
+      '</linearGradient>'+
+      '<linearGradient id="'+g+'Gloss" x1="0" y1="0" x2="1" y2="1">'+
+        '<stop offset="0%" stop-color="rgba(255,220,170,.10)"/>'+
+        '<stop offset="35%" stop-color="rgba(255,200,140,.03)"/>'+
+        '<stop offset="100%" stop-color="rgba(0,0,0,0)"/>'+
+      '</linearGradient>'+
+    '</defs>'+
+    '<polygon points="6,0 194,0 200,6 200,66 194,72 6,72 0,66 0,6" fill="#100905"/>'+
+    '<polygon points="6.8,.8 193.2,.8 199.2,6.8 199.2,65.2 193.2,71.2 6.8,71.2 .8,65.2 .8,6.8" fill="url(#'+g+'Bevel)"/>'+
+    '<polygon points="9.5,3.5 190.5,3.5 196.5,9.5 196.5,62.5 190.5,68.5 9.5,68.5 3.5,62.5 3.5,9.5" fill="#1a100a" stroke="#683E2C" stroke-width=".7"/>'+
+    '<polygon points="11.5,5.5 188.5,5.5 194.5,11.5 194.5,60.5 188.5,66.5 11.5,66.5 5.5,60.5 5.5,11.5" fill="url(#'+g+'Face)"/>'+
+    '<polygon points="11.5,5.5 188.5,5.5 194.5,11.5 194.5,60.5 188.5,66.5 11.5,66.5 5.5,60.5 5.5,11.5" fill="url(#'+g+'Gloss)"/>'+
+    '<polyline points="12,6 188,6 194,12" fill="none" stroke="#c49068" stroke-width=".9" opacity=".55"/>'+
+    '<polyline points="6.5,12 6.5,60" fill="none" stroke="#b08058" stroke-width=".7" opacity=".4"/>'+
+    '<polyline points="12,66 188,66 194,60" fill="none" stroke="#1a0e08" stroke-width="1.1" opacity=".7"/>'+
+    riv(10.5,10.5)+riv(189.5,10.5)+riv(10.5,61.5)+riv(189.5,61.5)+
+  '</svg>';
+}
 function unitHTML(g){
   const signed=g.signed?1:0;
   const sc=g.id==='win'?{min:0,max:100}:g.id==='pos'?{min:0,max:POS_LIMIT}:g.signed?{min:-10,max:10}:{min:0,max:10};
@@ -288,7 +324,7 @@ function unitHTML(g){
     '</div>'+
     satImg('front','L','cw-fast',0.4)+satImg('front','R','ccw-fast',1.7)+
     satImg('front','L2','ccw',2.2)+satImg('front','R2','cw',0.9)+
-    '<div class="mano-plaque">'+partImg('gauge-plaque','plate')+
+    '<div class="mano-plaque">'+plaqueFrame(g.id)+
       '<div class="txt"><div class="lbl">'+g.label+'</div><div class="val">—</div></div></div></div>';
 }
 function mountGauges(){
