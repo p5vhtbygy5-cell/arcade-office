@@ -92,8 +92,9 @@ function fit(){
   const board=$('board');
   if(!board) return;
   if(innerWidth<=900){board.style.transform='';return;}
-  const s=Math.min(innerWidth/1920, innerHeight/1080);
-  const x=(innerWidth-1920*s)/2, y=(innerHeight-1080*s)/2;
+  const bw=board.offsetWidth||1920, bh=board.offsetHeight||1080;
+  const s=Math.min(innerWidth/bw, innerHeight/bh);
+  const x=(innerWidth-bw*s)/2, y=(innerHeight-bh*s)/2;
   board.style.transform='translate('+x+'px,'+y+'px) scale('+s+')';
 }
 fit();
@@ -597,19 +598,23 @@ function stationHtml(bot, st){
   const tok=st.token||'–';
   const ini=st.token?esc(initials(st.token)):'–';
   const thumb=st.image
-    ? '<span class="thumb"><img alt="" src="'+esc(st.image)+'" onerror="this.parentNode.textContent=\''+ini+'\'"></span>'
-    : '<span class="ini">'+ini+'</span>';
+    ? '<div class="thumb"><img alt="" src="'+esc(st.image)+'" onerror="this.parentNode.textContent=\''+ini+'\'"></div>'
+    : '<div class="thumb">'+ini+'</div>';
   const count=st.count==null?'–':String(st.count|0);
   const dlen=count.length>=4?' d4':count.length===3?' d3':'';
   const tag=st.tag||'–';
-  return '<div class="plaque">'+bot+'</div>'+
-    '<div class="station-mid">'+
-      '<div class="bot" role="img" aria-label="'+bot+'"></div>'+
-      '<div class="token-row"><div class="coin"><span class="ring"></span>'+thumb+'</div>'+
-      '<span class="tick">'+esc(tok)+'</span></div>'+
-      '<div class="nixie"><div class="shell"></div><div class="digit'+dlen+'">'+esc(count)+'</div></div>'+
-    '</div>'+
-    '<div class="tag'+(st.tag?'':' empty')+'">'+esc(tag)+'</div>';
+  const n=[...String(tok)].length;
+  const tcls=n>=14?' xs':n>=10?' xlong':n>=7?' long':'';
+  return '<div class="frame" aria-hidden="true"></div>'+
+    '<div class="inner" aria-hidden="true"></div>'+
+    '<div class="lamp" aria-hidden="true"></div>'+
+    '<div class="body">'+
+      '<div class="botname">'+esc(bot)+'</div>'+
+      '<div class="tok">'+thumb+
+        '<span class="tname'+tcls+'">'+esc(tok)+'</span></div>'+
+      '<div class="nixie"><div class="shell" aria-hidden="true"></div><div class="digit'+dlen+'">'+esc(count)+'</div></div>'+
+      '<div class="tag'+(st.tag?'':' empty')+'"><span class="txt">'+esc(tag)+'</span></div>'+
+    '</div>';
 }
 function renderPipeline(){
   const states={};
