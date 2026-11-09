@@ -6,7 +6,7 @@ let lastFeedAt=0;
 const deskFx=createDeskFx({io});
 const scan=createScan({io,extra:()=>({lastFeedAt:lastFeedAt||null}),onEnrich:()=>refreshPositionEnrich()});
 scan.start();
-app.use(express.json({limit:'200kb'}));
+app.use(express.json({limit:'1mb'})); // scan_sieve is up to 200 items on top of the rest of the feed
 function gzipJson(req,res,next){
   const orig=res.json.bind(res);
   res.json=function(body){
@@ -193,6 +193,38 @@ function cleanImage(v){
   if(!/^https?:\/\//i.test(s)||/[<>"\s]/.test(s))return null;
   return s;
 }
+const SIEVE_CAP=200;
+const SIEVE_STAGES=new Set(['cheap_reject','buysell_dropped','reject','soft_pass','hard_pass','handoff']);
+function cleanSieve(raw){
+  if(!raw||typeof raw!=='object'||Array.isArray(raw)) return null;
+  const numOr=v=>{const n=typeof v==='number'?v:+v; return (typeof v==='number'||(typeof v==='string'&&v.trim()!==''))&&Number.isFinite(n)?n:null;};
+  const capN=numOr(raw.cap);
+  const cap=Math.max(1, Math.min(SIEVE_CAP, capN==null?SIEVE_CAP:Math.round(capN)));
+  const items=[];
+  for(const it of (Array.isArray(raw.items)?raw.items:[]).slice(0, cap)){
+    if(!it||typeof it!=='object') continue;
+    const symbol=cleanSymbol(it.symbol||it.ticker);
+    if(!symbol) continue;
+    const stageRaw=String(it.stage||'').toLowerCase().replace(/[^a-z_]/g,'').slice(0,32);
+    const stage=SIEVE_STAGES.has(stageRaw)?stageRaw:(stageRaw?stageRaw.slice(0,32):null);
+    const mcap=numOr(it.mcap_usd!=null?it.mcap_usd:it.marketCap);
+    const handoff=it.handoff===true||it.handoff===1||String(it.handoff||'').toLowerCase()==='true'||stage==='handoff';
+    items.push({
+      symbol, address:cleanAddr(it.address), chain:str(it.chain,16), image:cleanImage(it.image),
+      mcap_usd:mcap, marketCap:mcap, stage, reason:it.reason?String(it.reason).replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').slice(0,180):'',
+      handoff
+    });
+  }
+  const totalN=numOr(raw.total), uncN=numOr(raw.total_uncapped), handN=numOr(raw.handoff_n);
+  return {
+    batch_id:str(raw.batch_id,40), cycleTs:str(raw.cycleTs||raw.cycle_ts,40),
+    interval_s:numOr(raw.interval_s), gap_s:numOr(raw.gap_s), batch_s:numOr(raw.batch_s),
+    total:totalN==null?items.length:Math.max(0, totalN|0),
+    total_uncapped:uncN==null?null:Math.max(0, uncN|0),
+    handoff_n:handN==null?items.filter(x=>x.handoff).length:Math.max(0, handN|0),
+    preview:raw.preview===true, cap, items
+  };
+}
 function livePnl(p){const b=p.pnlBase;if(b==null||!isFinite(b)||!b||p.price==null||!isFinite(+p.price))return null;return (p.price-b)/b*100*(p.side==='SHORT'?-1:1);}
 const enrSig=new WeakMap();
 function enrichPosition(p){if(!p||!p.address)return false;const v=scan.lookup(p.address);if(!v)return false;
@@ -251,8 +283,9 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   const announce=first?fresh.slice(-3):fresh.slice(-168); // Zlotr 2026-10-20 22:28: 7 bots x 24 (was 6)
   res.activity=fresh.length;
   announce.sort(chatBurstSort);
-  announce.forEach((a,i)=>setTimeout(()=>{const tm=/^\d\d:\d\d /.test(a.text)?a.text.slice(0,6):'',bt=tm?a.text.slice(6):a.text;io.emit('chat',{system:true,bot:a.bot,text:`${tm}🤖 ${a.bot}: ${bt}`,scope:'global',ts:Date.now()});io.emit('bubble',{id:'bot-'+a.bot,text:bt});bots.nudge(a.bot);},i*1500));
+  announce.forEach((a,i)=>setTimeout(()=>{const tm=/^\d\d:\d\d /.test(a.text)?a.text.slice(0,6):'',bt=tm?a.text.slice(6):a.text;io.emit('chat',{system:true,bot:a.bot,text:`${tm}🤖 ${a.bot}: ${bt}`,kind:a.kind||'',scope:'global',ts:Date.now()});io.emit('bubble',{id:'bot-'+a.bot,text:bt});bots.nudge(a.bot);},i*1500));
   if(b.top10&&Array.isArray(b.top10)&&b.top10.length){desk={...(desk||{}),top10:b.top10.slice(0,30),top10_cycle_ts:b.top10_cycle_ts,top10_prev:Array.isArray(b.top10_prev)?b.top10_prev.slice(0,30):null,top10_prev_cycle_ts:b.top10_prev_cycle_ts||null,top10_rule:b.top10_rule,updatedAt:b.updatedAt};publishDesk();}
+  if(Object.prototype.hasOwnProperty.call(b,'scan_sieve')) scan.setSieve(b.scan_sieve==null?null:cleanSieve(b.scan_sieve));
   if(b.news&&typeof b.news==='object'&&Array.isArray(b.news.items)){const items=b.news.items.slice(0,20).map(x=>({title:String(x&&x.title||'').replace(/[<>]/g,'').slice(0,140),source:String(x&&x.source||'').replace(/[<>]/g,'').slice(0,40),category:String(x&&x.category||'').slice(0,20),publishedAt:+(x&&x.publishedAt)||null})).filter(x=>x.title);
     if(items.length){feedNews={items,updatedAt:Date.parse(b.news.updatedAt)||Date.now(),error:null,source:'feed:'+String(b.news.source||'desk').slice(0,30)};io.emit('ticker',tickerOut());}}
   if(b.botEvents&&typeof b.botEvents==='object'){const ev={};for(const n of BOT_NAMES){const l=b.botEvents[n];ev[n]=(Array.isArray(l)?l:[]).slice(0,10).map(x=>({ts:String(x&&x.ts||'').slice(0,40),

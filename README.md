@@ -7,7 +7,7 @@ Wirtualne biuro i tablice desku (Node.js + Express + Socket.IO, bez kroku budowa
 - Wejście głębiej w pipeline (SCAN → VET → BOOK → kupno FILLS) daje mocniejszy efekt i dźwięk; kupno jest najgłośniejsze. Zamknięcie na minus ma osobny dźwięk, a zysk – dźwięk etapu RISK od szczytu PnL: (0,10]=0, (10,25]=I, (25,50]=II, (50,100]=III, >100=IV. Dźwięk jest z WebAudio (bez plików). Autoplay jest zablokowany do kliknięcia **WŁĄCZ DŹWIĘK**, jest też wyciszenie.
 - Czat publiczny: linia CHIEF/sędziego to samo `wybor: TOKEN`, bez confidence / worth / score.
 
-`GET /api/scan` → `{serverNow, rotateMs, cycleMs, index, total, tokens[], prev, lastFeedAt}`. Token niesie pola feedu oraz, gdy zdążą przyjść, `change5m/1h/6h/24h`, `volume*`, `fdv`, `buys*`/`sells*`, `pairCreatedAt`, `chart` (OHLCV 1h), `holders`, `holdersTop10`, `sources`. Socket.IO: `scan` (stan tablicy), `deskFx` (`stage` 1–4, `close` ze `stage` -1..4, `sell`, `risk`). Dołączenie `{spectate:true}` ogląda biuro bez avatara.
+`GET /api/scan` → `{serverNow, rotateMs, cycleMs, index, total, tokens[], prev, lastFeedAt, scan_sieve}`. Token niesie pola feedu oraz, gdy zdążą przyjść, `change5m/1h/6h/24h`, `volume*`, `fdv`, `buys*`/`sells*`, `pairCreatedAt`, `chart` (OHLCV 1h), `holders`, `holdersTop10`, `sources`. `scan_sieve` (albo `null`) to chrono lista sita z feedu (`batch_id`, `interval_s`, `items[]` z `handoff`); bez niej zostaje ranking top-12. Socket.IO: `scan` (stan tablicy, razem z `scan_sieve`), `deskFx` (`stage` 1–4, `close` ze `stage` -1..4, `sell`, `risk`). Dołączenie `{spectate:true}` ogląda biuro bez avatara.
 
 Wykres i holderzy: serwer pyta DexScreener (paczka adresów) i GeckoTerminal (maks. 8 zapytań/min, cache). Mint bierze z `top10[].address` albo z `positions[].address` (to samo czyszczenie: tylko A–Z, a–z, 0–9).
 
@@ -46,7 +46,7 @@ Sterowanie: strzałki / WASD – ruch, Enter – czat, Esc – powrót do gry. Z
 - `test.js`, `screenshot.js` – skrypty weryfikacyjne
 
 ## Tablica v2 (`/v2`)
-Osobny front (steampunk dashboard, nie gra). Stara strona `/` zostaje bez zmian. Dane z tych samych odczytów: `GET /api/feed`, `/api/positions`, `/api/portfolio`, `/api/scan`, `/api/ticker`, `/api/bot-events` oraz Socket.IO. `?demo=1` albo `?fixture=1` wstawia lokalny zestaw fixture (oznaczony na ekranie). `?badge=fixture` tylko pokazuje plakietkę, bez podmiany danych.
+Osobny front (steampunk dashboard, nie gra). Stara strona `/` zostaje bez zmian. Dane z tych samych odczytów: `GET /api/feed`, `/api/positions`, `/api/portfolio`, `/api/scan`, `/api/ticker`, `/api/bot-events` oraz Socket.IO. Gdy feed niesie `scan_sieve`, stanowisko SCAN przechodzi tokeny po kolei (odrzucone: powód na tabliczce; `handoff`: zielona kolba, pieczątka PASS, licznik przekazanych do VET). Bez `scan_sieve` zostaje rotacja top-12. Miedziany przełącznik głośnika (domyślnie wyłączony, `localStorage`) puszcza dźwięki PASS/RISK z `public/v2/assets/sounds/`. `?demo=1` albo `?fixture=1` wstawia lokalny zestaw fixture (oznaczony na ekranie). `?badge=fixture` tylko pokazuje plakietkę, bez podmiany danych.
 
 ## Wdrożenie publiczne
 Potrzebny hosting z trwałym procesem i WebSocketami (nie serverless typu Vercel/Netlify Functions).

@@ -74,6 +74,19 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
 .topRight{justify-self:end;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;padding:8px 12px;position:relative;isolation:isolate}
 .topRight>*{position:relative;z-index:1}
 #online{font-size:14px;color:var(--dim);letter-spacing:.04em}
+#audioBtn.speaker{
+  width:36px;height:36px;padding:0;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  color:#a87848;border:1px solid #8a5a32;
+  background:linear-gradient(180deg,#4a3018,#24160e);
+  box-shadow:inset 0 1px 0 rgba(255,214,170,.28), 0 1px 2px rgba(0,0,0,.5);
+}
+#audioBtn.speaker svg{width:18px;height:18px;display:block}
+#audioBtn.speaker.on{
+  color:#ffd78a;border-color:#e0b15a;
+  box-shadow:0 0 10px rgba(232,184,74,.45), inset 0 1px 0 rgba(255,220,170,.4);
+}
+#audioBtn.speaker.on.live{color:#ffe7b0}
 
 /* ---- pipeline: opal stations + thin amber pipes (preview5) ----
    Copper/opal frames are the same raster in light and dark themes. */
@@ -120,13 +133,16 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
   text-shadow:0 1px 0 #000,0 0 8px rgba(232,175,124,.18);
 }
 .station .tok{
+  position:relative;
   width:calc(100% - 2px);height:92px;
   display:flex;align-items:center;
   padding:0 12px 0 8px;margin:0;flex:0 0 auto;
   overflow:hidden;
   background:url("/v2/assets/token-plate.webp") center/100% 100% no-repeat;
   filter:drop-shadow(0 2px 3px rgba(0,0,0,.45));
+  transition:filter .18s ease;
 }
+.station .tok.swap{filter:drop-shadow(0 2px 3px rgba(0,0,0,.45)) brightness(1.12)}
 .station .tok .thumb{
   width:68px;height:68px;flex:0 0 68px;
   margin-left:2px;border-radius:50%;overflow:hidden;
@@ -136,6 +152,28 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
   box-shadow:0 0 0 2px #3a2414,0 0 0 3px #1a0e08,0 2px 5px rgba(0,0,0,.6);
 }
 .station .tok .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.station .tok .thumb.ph{background-image:var(--coin);background-size:cover;background-position:center;background-repeat:no-repeat;color:transparent}
+.station .tok .stamp{
+  position:absolute;z-index:8;left:50px;top:8px;
+  width:52px;height:52px;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;opacity:0;transform:rotate(-18deg) scale(.7);
+}
+.station.pass .tok .stamp{opacity:1;transform:rotate(-18deg) scale(1);transition:opacity .15s ease, transform .2s cubic-bezier(.2,1.4,.4,1)}
+.station .tok .stamp .ring{
+  position:absolute;inset:0;border:3px solid #2ecc71;border-radius:50%;
+  box-shadow:0 0 0 1px rgba(10,40,20,.55) inset, 0 0 8px rgba(46,204,113,.35);
+  opacity:.92;filter:contrast(1.15) saturate(1.1);
+}
+.station .tok .stamp .ring::before,
+.station .tok .stamp .ring::after{content:"";position:absolute;border-radius:50%;border:1.5px dashed rgba(46,204,113,.55)}
+.station .tok .stamp .ring::before{inset:4px}
+.station .tok .stamp .ring::after{inset:8px;border-style:dotted;opacity:.7}
+.station .tok .stamp .lab{
+  position:relative;z-index:2;font:800 12px/1 var(--flap);letter-spacing:.06em;color:#1f8f4a;
+  text-shadow:0 0 1px rgba(0,40,10,.8), 0 1px 0 rgba(255,255,255,.15);
+  -webkit-text-stroke:.4px rgba(10,60,25,.55);transform:rotate(18deg);
+}
 .station .tok .tname{
   flex:1 1 auto;min-width:0;margin-left:6px;
   text-align:right;
@@ -167,6 +205,15 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
 }
 .station .nixie .digit.d3{font-size:28px}
 .station .nixie .digit.d4{font-size:22px}
+.station.pass .nixie{
+  filter:drop-shadow(0 3px 5px rgba(0,0,0,.55)) drop-shadow(0 0 10px rgba(46,204,113,.85)) drop-shadow(0 0 22px rgba(30,180,90,.55));
+  animation:flaskBlink .55s ease-in-out 2;
+}
+.station.pass .nixie .digit{color:#c8ffd8;text-shadow:0 0 8px rgba(80,255,140,.95), 0 0 16px rgba(40,200,100,.7), 0 1px 0 #000}
+@keyframes flaskBlink{
+  0%,100%{filter:drop-shadow(0 3px 5px rgba(0,0,0,.55)) drop-shadow(0 0 6px rgba(46,204,113,.45))}
+  50%{filter:drop-shadow(0 3px 5px rgba(0,0,0,.55)) drop-shadow(0 0 18px rgba(60,255,130,1)) drop-shadow(0 0 32px rgba(30,200,90,.75))}
+}
 .station .tag{
   margin-top:4px;margin-bottom:0;
   min-width:118px;width:82%;height:38px;flex:0 0 auto;
@@ -176,6 +223,8 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
   padding:0;letter-spacing:0;overflow:visible;
 }
 .station .tag.empty{opacity:.45}
+.station .tag.passc .txt{color:#b8f0c8}
+.station .tag .txt.sm{font-size:12px;letter-spacing:.02em}
 .station .tag .txt{
   display:flex;align-items:center;justify-content:center;
   padding:0 10px;max-width:100%;
@@ -559,6 +608,9 @@ html[data-theme="light"] .mano-plaque .val{text-shadow:none}
   .station .body{left:10px;right:10px;top:8px;bottom:18px}
   .station .tok{height:64px;padding:0 8px 0 4px}
   .station .tok .thumb{width:48px;height:48px;flex-basis:48px;margin-left:2px;font-size:14px}
+  .station .tok .stamp{width:40px;height:40px;left:34px;top:2px}
+  .station .tok .stamp .lab{font-size:10px}
+  .station .tok .stamp .ring{border-width:2px}
   .station .tok .tname{font-size:14px;letter-spacing:.02em}
   .station .tok .tname.long{font-size:12px}
   .station .tok .tname.xlong{font-size:11px}
