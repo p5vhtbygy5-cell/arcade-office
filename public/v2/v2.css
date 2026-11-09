@@ -383,7 +383,7 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
 #log .sys{color:var(--cream)}
 #log .tag{color:var(--copper)}
 #log b{font-weight:600;color:var(--amber)}
-#plist .ev-o{color:var(--good-hi)}
+#plist .ev-o{color:#fff}
 #plist .ev-p{color:var(--good-hi)}
 #plist .ev-l{color:var(--bad-hi)}
 #plist .b{color:var(--dim)}
