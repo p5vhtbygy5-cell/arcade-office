@@ -8,7 +8,7 @@ const SEATS=['SCAN','VET','BOOK','SIZE','FILLS','RISK'];
 const COLS=['SYMBOL','PNL%','1H','6H','24H','MCAP','PASS','ST'];
 const COLK=['sym','pnl','h1','h6','h24','mcap','pass','st'];
 const $=id=>document.getElementById(id);
-const audio=window.AUDIO?AUDIO.create():null;
+const TIMING=window.SIEVE_TIMING||{computeDwells:()=>({dwells:[],budget:0}),isHandoff:it=>!!(it&&it.handoff===true)};
 const fixtureOn=/\b(demo|fixture)=1\b/.test(location.search);
 const badgeOn=fixtureOn||/\bbadge=fixture\b/.test(location.search);
 
@@ -16,6 +16,7 @@ let me=null, players={}, positions={}, portfolio=null, ticker=null, scan=null;
 let botEvents={}, feedAt=0, posEvents=[], chatHist=[], joined=false, myName='';
 let fixture=false, lastPosSig='', lastPortSig='', lastPipeSig='', lastChatSig='', lastEvSig='', lastTickSig='';
 let statsReady=false;
+let sieveBatch=null, sievePlan=null, sieveFrame=null, sieveIdx=0, sieveTimer=null, sievePending=null, sieveHold=false;
 
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function num(v){const n=+v;return Number.isFinite(n)?n:null;}
@@ -527,6 +528,7 @@ function seatState(bot){
   const lines=lastActivity(bot);
   let token=null, count=null, tag=null, image=null;
   const pick=re=>{for(const a of lines){const t=grabTok(a.text,re); if(t) return t;} return null;};
+  if(bot==='SCAN' && sieveFrame) return sieveFrame;
   if(bot==='SCAN'){
     const tok=currentScanTok();
     token=tok?(tok.displaySymbol||tok.symbol):pick(/Skan(?:uję|uje|):\s*(\S+)/i)||pick(/token(?:ow|ów)?\b.*?(\p{L}[\p{L}\p{N}_-]{1,20})/u);
@@ -597,23 +599,26 @@ function seatState(bot){
 function stationHtml(bot, st){
   const tok=st.token||'–';
   const ini=st.token?esc(initials(st.token)):'–';
+  const scanPlate=bot==='SCAN';
   const thumb=st.image
-    ? '<div class="thumb"><img alt="" src="'+esc(st.image)+'" onerror="this.parentNode.textContent=\''+ini+'\'"></div>'
-    : '<div class="thumb">'+ini+'</div>';
+    ? '<div class="thumb"><img alt="" src="'+esc(st.image)+'" onerror="'+(scanPlate?'this.parentNode.classList.add(\'ph\');this.remove()':'this.parentNode.textContent=\''+ini+'\'')+'"></div>'
+    : (scanPlate&&st.usePlaceholder?'<div class="thumb ph"></div>':'<div class="thumb">'+ini+'</div>');
   const count=st.count==null?'–':String(st.count|0);
   const dlen=count.length>=4?' d4':count.length===3?' d3':'';
   const tag=st.tag||'–';
   const n=[...String(tok)].length;
   const tcls=n>=14?' xs':n>=10?' xlong':n>=7?' long':'';
+  const stamp=st.pass?'<span class="stamp" aria-hidden="true"><span class="ring"></span><span class="lab">PASS</span></span>':'';
+  const tagLen=[...String(tag)].length;
   return '<div class="frame" aria-hidden="true"></div>'+
     '<div class="inner" aria-hidden="true"></div>'+
     '<div class="lamp" aria-hidden="true"></div>'+
     '<div class="body">'+
       '<div class="botname">'+esc(bot)+'</div>'+
-      '<div class="tok">'+thumb+
+      '<div class="tok">'+thumb+stamp+
         '<span class="tname'+tcls+'">'+esc(tok)+'</span></div>'+
       '<div class="nixie"><div class="shell" aria-hidden="true"></div><div class="digit'+dlen+'">'+esc(count)+'</div></div>'+
-      '<div class="tag'+(st.tag?'':' empty')+'"><span class="txt">'+esc(tag)+'</span></div>'+
+      '<div class="tag'+(st.tag?'':' empty')+(st.pass?' passc':'')+'"><span class="txt'+(tagLen>14?' sm':'')+'">'+esc(tag)+'</span></div>'+
     '</div>';
 }
 function renderPipeline(){
@@ -624,8 +629,223 @@ function renderPipeline(){
   lastPipeSig=sig;
   document.querySelectorAll('.station').forEach(el=>{
     const bot=el.getAttribute('data-seat');
-    el.innerHTML=stationHtml(bot, states[bot]||{});
+    const st=states[bot]||{};
+    const part=JSON.stringify(st);
+    if(el.dataset.sig===part) return;
+    el.dataset.sig=part;
+    el.innerHTML=stationHtml(bot, st);
+    if(st.pass){
+      const key=String(st.token)+'|'+String(st.count);
+      if(el.dataset.passKey!==key){
+        el.classList.remove('pass');
+        void el.offsetWidth;
+        el.classList.add('pass');
+        el.dataset.passKey=key;
+      }else if(!el.classList.contains('pass')) el.classList.add('pass');
+    }else{
+      el.classList.remove('pass');
+      delete el.dataset.passKey;
+    }
+    if(bot==='SCAN'&&sieveFrame){
+      const tok=el.querySelector('.tok');
+      if(tok){tok.classList.add('swap'); setTimeout(()=>tok.classList.remove('swap'), 180);}
+    }
   });
+}
+
+function clearSieveTimer(){ if(sieveTimer){ clearTimeout(sieveTimer); sieveTimer=null; } }
+function sieveTag(it, pass){
+  if(pass) return 'PASS → VET';
+  let r=String((it&&(it.reason||it.stage))||'–').replace(/[<>]/g,'');
+  const chars=[...r];
+  if(chars.length>18) r=chars.slice(0,17).join('')+'…';
+  return r||'–';
+}
+function sieveCountAt(items, i){
+  const pass=TIMING.isHandoff(items[i]);
+  const upto=pass?i+1:i;
+  let n=0;
+  for(let k=0;k<upto;k++) if(TIMING.isHandoff(items[k])) n++;
+  return n;
+}
+function showSieve(i, opts){
+  if(!sieveBatch||!sieveBatch.items||!sieveBatch.items[i]) return;
+  const it=sieveBatch.items[i];
+  const pass=TIMING.isHandoff(it);
+  sieveIdx=i;
+  const name=it.symbol||'–';
+  sieveFrame={
+    token:name,
+    count:sieveCountAt(sieveBatch.items, i),
+    tag:sieveTag(it, pass),
+    image:it.image||null,
+    pass:pass,
+    usePlaceholder:!it.image
+  };
+  lastPipeSig='';
+  renderPipeline();
+  if(opts&&opts.sound&&pass) sfxPlay('scan_pass');
+}
+function sieveEndMs(){
+  if(!sieveBatch) return null;
+  const t0=Date.parse(sieveBatch.cycleTs);
+  const iv=(Number(sieveBatch.interval_s)>0?Number(sieveBatch.interval_s):120)*1000;
+  return Number.isFinite(t0)?t0+iv:null;
+}
+function scheduleSieve(ms){
+  clearSieveTimer();
+  if(sieveHold) return;
+  sieveTimer=setTimeout(advanceSieve, Math.max(0, Math.round(ms)||0));
+}
+function advanceSieve(){
+  sieveTimer=null;
+  if(sieveHold) return;
+  if(sievePending){
+    const next=sievePending; sievePending=null;
+    startSieve(next);
+    return;
+  }
+  if(!sieveBatch||!sievePlan) return;
+  const items=sieveBatch.items, dwells=sievePlan.dwells||[];
+  const end=sieveEndMs();
+  let j=sieveIdx+1;
+  while(j<items.length){
+    const d=dwells[j]||0;
+    if(d<=0){ j++; continue; }
+    if(!TIMING.isHandoff(items[j]) && end!=null && Date.now()+d>end+50){ j++; continue; }
+    break;
+  }
+  if(j>=items.length) return;
+  showSieve(j, {sound:true});
+  scheduleSieve(dwells[j]||0);
+}
+function holdIndex(items, hold){
+  if(typeof hold==='number'&&Number.isFinite(hold)) return Math.max(0, Math.min(items.length-1, hold|0));
+  if(hold==='pass'){
+    const i=items.findIndex(it=>TIMING.isHandoff(it));
+    return i<0?0:i;
+  }
+  const i=items.findIndex(it=>!TIMING.isHandoff(it));
+  return i<0?0:i;
+}
+function startSieve(sv){
+  clearSieveTimer();
+  sievePending=null;
+  sieveBatch=sv;
+  sievePlan=TIMING.computeDwells(sv.items, sv.interval_s||120);
+  const items=sv.items, dwells=sievePlan.dwells||[];
+  const hold=window.__SIEVE_HOLD;
+  if(hold){
+    sieveHold=true;
+    showSieve(holdIndex(items, hold), {sound:false});
+    return;
+  }
+  sieveHold=false;
+  let elapsed=0;
+  const t0=Date.parse(sv.cycleTs);
+  if(Number.isFinite(t0)) elapsed=Math.max(0, Date.now()-t0);
+  let i=0, acc=0;
+  while(i<items.length-1 && acc+(dwells[i]||0)<=elapsed){ acc+=(dwells[i]||0); i++; }
+  while(i<items.length-1 && !(dwells[i]>0)) i++;
+  const into=Math.max(0, elapsed-acc);
+  const dwell=dwells[i]||0;
+  const finished=elapsed>0 && acc+dwell<=elapsed;
+  const fresh=!finished && i===0 && into<400;
+  showSieve(i, {sound:fresh});
+  if(!finished && dwell>into) scheduleSieve(dwell-into);
+}
+function stopSieve(){
+  clearSieveTimer();
+  sieveBatch=null; sievePlan=null; sieveFrame=null; sievePending=null; sieveHold=false; sieveIdx=0;
+  lastPipeSig='';
+  document.querySelectorAll('.station').forEach(el=>{ delete el.dataset.sig; delete el.dataset.passKey; el.classList.remove('pass'); });
+}
+function noteSieve(sv){
+  if(!sv||typeof sv!=='object'||!Array.isArray(sv.items)||!sv.items.length){
+    if(sieveBatch) stopSieve();
+    return;
+  }
+  const id=String(sv.batch_id||sv.cycleTs||'');
+  const cur=sieveBatch?String(sieveBatch.batch_id||sieveBatch.cycleTs||''):'';
+  if(sieveBatch&&id&&id===cur) return;
+  if(sieveTimer){ sievePending=sv; return; }
+  startSieve(sv);
+}
+function holdSieve(which){
+  if(!sieveBatch) return null;
+  sieveHold=true;
+  clearSieveTimer();
+  const i=holdIndex(sieveBatch.items, which);
+  showSieve(i, {sound:false});
+  return sieveFrame;
+}
+
+const SFX_GAIN={scan_pass:0.600, vet_pass:0.636, book_pass:0.672, size_pass:0.708, fills_pass:0.744, risk_profit:0.900, risk_loss:0.900};
+const SFX_FILES=Object.keys(SFX_GAIN);
+const SPEAKER_KEY='ao.v2.speaker';
+let speakerOn=false, sfxCtx=null, sfxUnlocked=false;
+const sfxBuf={}, sfxRecent={}, sfxLog=[];
+try{ speakerOn=localStorage.getItem(SPEAKER_KEY)==='on'; }catch(e){}
+function sfxUrl(name, ext){ return '/v2/assets/sounds/'+name+'.'+ext; }
+async function sfxLoad(name){
+  if(sfxBuf[name]) return sfxBuf[name];
+  if(!sfxCtx) return null;
+  const load=async ext=>{
+    const res=await fetch(sfxUrl(name, ext));
+    if(!res.ok) throw new Error(ext);
+    const ab=await res.arrayBuffer();
+    return sfxCtx.decodeAudioData(ab.slice(0));
+  };
+  try{ sfxBuf[name]=await load('mp3'); }
+  catch(e){ sfxBuf[name]=await load('ogg'); }
+  return sfxBuf[name];
+}
+function sfxPreload(){ SFX_FILES.forEach(n=>{ sfxLoad(n).catch(()=>{}); }); }
+async function sfxUnlock(){
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC) return false;
+  if(!sfxCtx) sfxCtx=new AC();
+  if(sfxCtx.state!=='running'){ try{ await sfxCtx.resume(); }catch(e){} }
+  sfxUnlocked=sfxCtx.state==='running';
+  if(sfxUnlocked) sfxPreload();
+  return sfxUnlocked;
+}
+function sfxPlay(name){
+  if(!speakerOn||!sfxUnlocked||!sfxCtx||sfxCtx.state!=='running') return false;
+  if(!SFX_GAIN[name]) return false;
+  const now=performance.now();
+  const recent=(sfxRecent[name]||[]).filter(t=>now-t<1000);
+  if(recent.length>=3){ sfxRecent[name]=recent; return false; }
+  recent.push(now); sfxRecent[name]=recent;
+  sfxLog.push({id:name, t:Date.now()});
+  if(sfxLog.length>40) sfxLog.shift();
+  sfxLoad(name).then(buf=>{
+    if(!buf||!speakerOn||!sfxCtx) return;
+    const src=sfxCtx.createBufferSource();
+    const g=sfxCtx.createGain();
+    g.gain.value=SFX_GAIN[name];
+    src.buffer=buf; src.connect(g); g.connect(sfxCtx.destination);
+    src.start();
+  }).catch(()=>{});
+  return true;
+}
+const SPK_OFF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l4 3V7L7 10H4z"/><path d="M16 9.5l4 5M20 9.5l-4 5"/></svg>';
+const SPK_ON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l4 3V7L7 10H4z"/><path d="M16 9a3.2 3.2 0 010 6"/><path d="M18.2 7a6 6 0 010 10"/></svg>';
+function paintAudio(){
+  const btn=$('audioBtn'); if(!btn) return;
+  btn.classList.toggle('on', speakerOn);
+  btn.classList.toggle('live', speakerOn&&sfxUnlocked);
+  btn.setAttribute('aria-pressed', speakerOn?'true':'false');
+  btn.setAttribute('aria-label', speakerOn?(sfxUnlocked?'Dźwięk włączony':'Dźwięk włączony, kliknij aby odblokować'):'Dźwięk wyłączony');
+  btn.innerHTML=speakerOn?SPK_ON:SPK_OFF;
+}
+function maybeSizeSound(m){
+  if(!m||!m.system) return;
+  const bot=String(m.bot||'').toUpperCase();
+  if(bot!=='SIZE') return;
+  const kind=String(m.kind||'');
+  const text=String(m.text||'');
+  if(kind==='handoff'||/Przekazuj[ęe]|Przekaza[łl]em|Przekazuje/i.test(text)) sfxPlay('size_pass');
 }
 
 function renderGauges(){
@@ -821,6 +1041,7 @@ function pushChat(m){
   if(!m) return;
   if(m.system&&m.bot){
     chatHist.push({ts:m.ts||Date.now(), bot:m.bot, text:String(m.text||'').replace(/^.*🤖\s+\w+:\s*/,''), kind:m.kind||''});
+    maybeSizeSound(m);
   }else if(!m.system){
     chatHist.push({ts:m.ts||Date.now(), bot:m.name||'USER', text:m.text||'', kind:'chat'});
   }else{
@@ -846,24 +1067,36 @@ socket.on('position', p=>{if(!p||!p.id) return; positions[p.id]=p; feedAt=Date.n
 socket.on('positionClosed', id=>{delete positions[id]; lastPosSig=''; lastPipeSig=''; renderAll();});
 socket.on('portfolio', d=>{if(d&&typeof d==='object'&&!d.empty){portfolio=d; feedAt=Date.now(); lastPortSig=''; renderPort(); renderGauges();}});
 socket.on('ticker', d=>{if(d&&typeof d==='object'){ticker=d; lastTickSig=''; renderTicker();}});
-socket.on('scan', d=>{if(d&&typeof d==='object'){scan=d; if(d.lastFeedAt) feedAt=d.lastFeedAt; lastPipeSig=''; renderPipeline(); renderGauges();}});
+socket.on('scan', d=>{
+  if(!d||typeof d!=='object') return;
+  scan=d;
+  if(d.lastFeedAt) feedAt=d.lastFeedAt;
+  if(Object.prototype.hasOwnProperty.call(d,'scan_sieve')) noteSieve(d.scan_sieve);
+  lastPipeSig='';
+  renderPipeline();
+  renderGauges();
+});
 socket.on('posEvents', evs=>{posEvents=Array.isArray(evs)?evs:[]; statsReady=true; lastEvSig=''; renderEvents(); renderGauges();});
 socket.on('deskFx', ev=>{
-  if(!audio||!ev) return;
-  if(ev.kind==='stage') audio.stage(ev.level);
-  else if(ev.kind==='close') audio.close(ev.stage);
-  else if(ev.kind==='sell') audio.sell();
+  if(!ev) return;
+  if(ev.kind==='stage'){
+    const bot=String(ev.bot||'').toUpperCase();
+    const lv=ev.level|0;
+    if(lv===2&&bot==='VET') sfxPlay('vet_pass');
+    else if(lv===3&&bot==='BOOK') sfxPlay('book_pass');
+    else if(lv===4) sfxPlay('fills_pass');
+  }else if(ev.kind==='close'){
+    const pnl=Number.isFinite(+ev.pct)?+ev.pct:(Number.isFinite(+ev.net)?+ev.net:null);
+    sfxPlay(pnl>0?'risk_profit':'risk_loss');
+  }
 });
 
-function paintAudio(){
-  if(!audio) return;
-  if(!audio.unlocked) $('audioBtn').textContent='WŁĄCZ DŹWIĘK';
-  else $('audioBtn').textContent=audio.muted?'DŹWIĘK WYŁ':'DŹWIĘK WŁ';
-}
 $('audioBtn').onclick=async()=>{
-  if(!audio) return;
-  if(!audio.unlocked){audio.setMuted(false); await audio.unlock(); paintAudio(); return;}
-  audio.setMuted(!audio.muted); paintAudio();
+  if(speakerOn&&!sfxUnlocked){ await sfxUnlock(); paintAudio(); return; }
+  speakerOn=!speakerOn;
+  try{ localStorage.setItem(SPEAKER_KEY, speakerOn?'on':'off'); }catch(e){}
+  if(speakerOn) await sfxUnlock();
+  paintAudio();
 };
 $('nick').value=localStorage.nick||'';
 $('go').onclick=()=>{
@@ -904,6 +1137,7 @@ async function loadHistory(){
     if(port&&!port.empty) portfolio=port;
     if(tick) ticker=tick;
     if(sc&&sc.tokens) scan=sc;
+    if(sc&&Object.prototype.hasOwnProperty.call(sc,'scan_sieve')) noteSieve(sc.scan_sieve);
     if(bev&&typeof bev==='object') botEvents=bev;
     if((!Object.keys(positions).length)&&Array.isArray(pos)&&pos.length) takePositions(pos);
     statsReady=true;
@@ -918,6 +1152,7 @@ function showFixtureBadge(){
 function applyFixture(){
   if(!fixtureOn) return;
   fixture=true;
+  stopSieve();
   statsReady=true;
   showFixtureBadge();
   const now=Date.now();
@@ -1008,7 +1243,9 @@ setInterval(()=>{
   if(scan&&scan.tokens&&scan.tokens.length){ /* rotate with server index if present */ renderPipeline(); }
 },1000);
 
+paintAudio();
 window.AO2={positions:()=>positions, portfolio:()=>portfolio, scan:()=>scan, fixture:()=>fixture, render:renderAll,
+  sieve:()=>sieveFrame, dwells:()=>sievePlan, holdSieve, noteSieve, sfxLog:()=>sfxLog.slice(), speaker:()=>speakerOn,
   gauges:()=>Array.from(document.querySelectorAll('#gauges .mano')).map(el=>{
     const n=needleState.get(el.querySelector('.needle'));
     const val=el.querySelector('.mano-plaque .val');

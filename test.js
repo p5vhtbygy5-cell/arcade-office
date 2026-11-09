@@ -1,6 +1,23 @@
 const {io}=require('socket.io-client');const U='http://localhost:3000';
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{const a=io(U),b=io(U);const got={a:[],b:[]};let ok=true;const chk=(c,m)=>{console.log((c?'PASS':'FAIL')+' '+m);ok=ok&&c;};
+const ST=require('./public/v2/sieve-timing.js');
+const sumD=a=>a.reduce((x,y)=>x+y,0);
+const near=(x,y,e=1e-4)=>Math.abs(x-y)<=e;
+{
+  const items=[]; for(let i=0;i<179;i++) items.push({handoff:i===10||i===40||i===80||i===120||i===160});
+  const p=ST.computeDwells(items,142);
+  const budget=0.92*142000;
+  chk(p.dwells.length===179&&p.skipped===0&&near(p.handMs,4000)&&near(p.rejMs,(budget-20000)/174)&&sumD(p.dwells)<=budget+1e-4,'dwell: 179 tokenów, 5 handoff, 142s — handoff 4s, reszta dla odrzutów');
+  const small=[]; for(let i=0;i<22;i++) small.push({handoff:i<2});
+  const q=ST.computeDwells(small,10);
+  chk(q.handMs===4000&&q.skipped===17&&q.dwells.filter(d=>d===350).length===3&&sumD(q.dwells)<=q.budget+1e-6,'dwell: podłoga 0.35s, nadmiar odrzutów skip-ahead, suma mieści się w 0.92×interwał');
+  const h=ST.computeDwells(Array.from({length:6},()=>({handoff:true})),20);
+  chk(h.handMs>=2500&&h.handMs<=6000&&near(h.handMs,0.92*20000/6)&&near(sumD(h.dwells),h.budget),'dwell: handoff schodzi z 4s w zakres 2.5–6s, gdy 4s nie mieści się w budżecie');
+  const t=ST.computeDwells(Array.from({length:5},()=>({handoff:true})),10);
+  chk(t.handMs<2500&&near(sumD(t.dwells),t.budget),'dwell: handoff poniżej 2.5s tylko gdy inaczej paczka przekroczyłaby budżet');
+  chk(ST.isHandoff({handoff:true})&&!ST.isHandoff({handoff:false,stage:'soft_pass'}),'dwell: PASS to handoff=true, samo soft_pass nie');
+}
 for(const [n,s] of [['a',a],['b',b]]){s.onAny((e,d)=>got[n].push([e,d]));}
 a.emit('join',{name:'Alicja',color:'#00f0ff',sprite:1});await wait(200);b.emit('join',{name:'Bartek',color:'#39ff14',sprite:2});await wait(300);
 chk(got.a.some(([e,d])=>e=='playerJoined'&&d.name=='Bartek'),'A widzi dołączenie B');
@@ -88,6 +105,30 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  fr=await fp({positions:[],activity:[],top10:[{ticker:'AAA',chain:'solana',priceUSD:1,marketCap:10,liquidity:5,change_1h:1.5,stage:'soft_pass',reason:'soft pass'},{ticker:'BBB',chain:'solana',priceUSD:1,marketCap:10,liquidity:5,change_1h:-1,stage:'cheap_reject',reason:'cheap'}],top10_rule:'test',top10_cycle_ts:'2026-10-27T12:00:00Z'});
  const sc=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
  chk(sc.total===1&&sc.tokens&&sc.tokens[0].symbol==='AAA'&&!sc.tokens.some(t=>String(t.symbol).toUpperCase()==='BBB'),'Skan: cheap_reject (CHP-) nie wchodzi na tablicę');
+ const sieve={batch_id:'20261109T232157',cycleTs:'2026-11-09T23:21:57+01:00',interval_s:142,gap_s:20,batch_s:121.7,total:3,total_uncapped:3,handoff_n:1,preview:false,cap:200,items:[
+   {symbol:'forg',address:'MintForg',chain:'solana',image:'https://img.example/forg.png',mcap_usd:143943,marketCap:143943,stage:'cheap_reject',reason:'holders=45, top_10=1.00',handoff:false},
+   {symbol:'MILES',address:'MintMiles',chain:'solana',image:'javascript:alert(1)',stage:'soft_pass',reason:'handoff',handoff:true},
+   {symbol:'<>',stage:'nope',reason:'x',handoff:false},
+   {symbol:'SKIPSTAGE',stage:'handoff',reason:'stage handoff',handoff:false}
+ ]};
+ const nScan=fev.length;
+ fr=await fp({positions:[],activity:[],scan_sieve:sieve});
+ chk(fr.s===200,'Feed ze scan_sieve -> 200');
+ await wait(400);
+ let sc2=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
+ const sv=sc2.scan_sieve;
+ chk(!!sv&&sv.batch_id==='20261109T232157'&&sv.interval_s===142&&sv.cap===200&&sv.handoff_n===1&&sv.items.length===3,'GET /api/scan niesie scan_sieve (cap, interval, batch)');
+ chk(sv&&sv.items[0].symbol==='forg'&&sv.items[0].stage==='cheap_reject'&&sv.items[0].handoff===false&&sv.items[0].image==='https://img.example/forg.png','Sito trzyma cheap_reject i obraz https');
+ chk(sv&&sv.items[1].symbol==='MILES'&&sv.items[1].handoff===true&&sv.items[1].image==null,'handoff=true zostaje, obraz nie-http odpada');
+ chk(sv&&sv.items[2].symbol==='SKIPSTAGE'&&sv.items[2].handoff===true,'stage handoff liczy się jako przekazanie; pusty symbol odpada');
+ chk(sc2.total===1&&sc2.tokens[0].symbol==='AAA'&&!sc2.tokens.some(t=>t.symbol==='forg'),'Ranking top-12 bez zmian, gdy sito jest obok');
+ chk(fev.slice(nScan).some(([e,d])=>e==='scan'&&d.scan_sieve&&d.scan_sieve.batch_id==='20261109T232157'),'Socket scan niesie scan_sieve');
+ fr=await fp({positions:[],activity:[]});
+ sc2=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
+ chk(sc2.scan_sieve&&sc2.scan_sieve.batch_id==='20261109T232157','Feed bez pola scan_sieve zostawia poprzednie sito');
+ fr=await fp({positions:[],activity:[],scan_sieve:null});
+ sc2=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
+ chk(sc2.scan_sieve==null&&sc2.total===1,'scan_sieve:null czyści sito, top-12 zostaje');
  fr=await fp({positions:[{id:'U-1',bot:'RISK',symbol:'Łódź',chain:'solana',side:'LONG',size:10,entry:1,price:1.1,mode:'SHADOW'}],activity:[]});
  fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
  chk(fl.some(p=>p.symbol==='Łódź'),'Symbol z polskimi znakami zostaje na tablicy');

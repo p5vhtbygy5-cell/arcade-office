@@ -16,6 +16,7 @@ const nets=chain=>{const k=String(chain||'solana').toLowerCase();return NET[k]||
 function notCheap(it){const s=String(it&&it.stage||'').toLowerCase();return s!=='cheap_reject'&&s!=='chp-'&&s!=='chp';}
 
 let items=[], extras=[], extraSig='', prev=null, rule='', cycleMs=0, cycleTs=null, rev=0, lastSig='';
+let sieve=null, sieveSig='';
 const dex=new Map();   // address -> {at, fail, data}
 const ohlcv=new Map(); // pair -> {at, fail, rows}
 const info=new Map();  // address -> {at, fail, data}
@@ -40,6 +41,13 @@ function setFromTop(top){
   }
   items=next; prev=top.prev||null; rule=top.rule||rule;
   maybeEmit(Date.now());
+}
+function setSieve(next){
+  const sig=next?JSON.stringify(next):'';
+  if(sig===sieveSig) return false;
+  sieveSig=sig; sieve=next||null; rev++; lastKey='';
+  maybeEmit(Date.now());
+  return true;
 }
 function view(it){
   const addr=it.address||null;
@@ -91,7 +99,7 @@ function snapshot(now){
     index:idx, total:n, showMs:n?ROTATE-into:0,
     tokens:items.map((it,i)=>{const v=view(it); if(i!==idx){const c=v.chart; if(c) v.chart=null;} return v;}),
     prev:prev&&Array.isArray(prev.items)?{updatedAt:prev.updatedAt||null, items:prev.items.filter(notCheap).slice(0,12).map(it=>({symbol:it.symbol,chain:it.chain,stage:it.stage,reason:it.reason,price:num(it.price),marketCap:num(it.marketCap),liquidity:num(it.liquidity),change1h:num(it.change1h),address:it.address||null}))}:null,
-    dexError:dexErr, geckoPause:gtPause>now
+    dexError:dexErr, geckoPause:gtPause>now, scan_sieve:sieve||null
   };
   try{Object.assign(base, extra?extra():null);}catch{}
   return base;
@@ -106,7 +114,7 @@ function snapshotFull(now){
     index:idx, total:n, showMs:n?ROTATE-into:0,
     tokens:items.map(view),
     prev:prev&&Array.isArray(prev.items)?{updatedAt:prev.updatedAt||null, items:prev.items.filter(notCheap).slice(0,12).map(it=>({symbol:it.symbol,chain:it.chain,stage:it.stage,reason:it.reason,price:num(it.price),marketCap:num(it.marketCap),liquidity:num(it.liquidity),change1h:num(it.change1h),address:it.address||null}))}:null,
-    dexError:dexErr, geckoPause:gtPause>now
+    dexError:dexErr, geckoPause:gtPause>now, scan_sieve:sieve||null
   };
   try{Object.assign(base, extra?extra():null);}catch{}
   return base;
@@ -269,5 +277,5 @@ async function tick(){
   maybeEmit(Date.now());
 }
 function start(){setInterval(()=>{tick().catch(e=>console.log('scan', e.message));}, 1000);}
-return {setFromTop, snapshot:snapshotFull, start, notCheap, watch, lookup, tick};
+return {setFromTop, setSieve, snapshot:snapshotFull, start, notCheap, watch, lookup, tick};
 };

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Chakra+Petch:wght@500;600;700&family=Cinzel:wght@700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/v2/v2.css?v=10">
+<link rel="stylesheet" href="/v2/v2.css?v=11">
 </head>
 <body>
 <div id="fit">
@@ -28,7 +28,7 @@
       <div class="sub">DESK PUBLICZNY</div>
     </div>
     <div class="topRight">
-      <button id="audioBtn" type="button">WŁĄCZ DŹWIĘK</button>
+      <button id="audioBtn" class="speaker" type="button" aria-pressed="false" aria-label="Dźwięk wyłączony" title="Dźwięk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l4 3V7L7 10H4z"/><path d="M16 9.5l4 5M20 9.5l-4 5"/></svg></button>
       <input id="nick" maxlength="16" placeholder="imię" autocomplete="off" spellcheck="false">
       <button id="go" type="button">WEJDŹ</button>
       <div id="online">Online: 0</div>
@@ -110,6 +110,7 @@
 </div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/audio.js"></script>
-<script src="/v2/v2.js?v=10"></script>
+<script src="/v2/sieve-timing.js?v=11"></script>
+<script src="/v2/v2.js?v=11"></script>
 </body>
 </html>
