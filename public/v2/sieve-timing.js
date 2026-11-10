@@ -1,6 +1,7 @@
-// SCAN sieve dwells. Nominal 4s per handoff (clamp 2.5–6s). Rejects share the
-// rest of 0.92×interval. Reject dwell has a 0.35s floor; if that would overrun
-// the budget, extra rejects are skipped (dwell 0) so the batch still fits.
+// Sieve dwells for SCAN, VET, and later seats. Nominal 4s per handoff (clamp
+// 2.5–6s). Rejects share the rest of 0.92×interval. Reject dwell has a 0.35s
+// floor; if that would overrun the budget, extra rejects are skipped (dwell 0)
+// so the batch still fits. VET batches are small, so that floor rarely applies.
 (function(root, factory){
   if(typeof module==='object'&&module.exports) module.exports=factory();
   else root.SIEVE_TIMING=factory();

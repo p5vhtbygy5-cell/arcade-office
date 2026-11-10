@@ -16,7 +16,10 @@ let me=null, players={}, positions={}, portfolio=null, ticker=null, scan=null;
 let botEvents={}, feedAt=0, posEvents=[], chatHist=[], joined=false, myName='';
 let fixture=false, lastPosSig='', lastPortSig='', lastPipeSig='', lastChatSig='', lastEvSig='', lastTickSig='';
 let statsReady=false;
-let sieveBatch=null, sievePlan=null, sieveFrame=null, sieveIdx=0, sieveTimer=null, sievePending=null, sieveHold=false;
+const SIEVE_SEATS=['SCAN','VET','BOOK','SIZE','FILLS'];
+const PASS_TAG={SCAN:'PASS → VET', VET:'PASS → BOOK', BOOK:'PASS → SIZE', SIZE:'PASS → FILLS', FILLS:'PASS → RISK'};
+const SIEVE_SFX={SCAN:'scan_pass', VET:'vet_pass', BOOK:'book_pass', SIZE:'size_pass', FILLS:'fills_pass'};
+const sieveState={};
 
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function num(v){const n=+v;return Number.isFinite(n)?n:null;}
@@ -528,7 +531,10 @@ function seatState(bot){
   const lines=lastActivity(bot);
   let token=null, count=null, tag=null, image=null;
   const pick=re=>{for(const a of lines){const t=grabTok(a.text,re); if(t) return t;} return null;};
-  if(bot==='SCAN' && sieveFrame) return sieveFrame;
+  if(SIEVE_SEATS.includes(bot)){
+    const frame=sieveOf(bot).frame;
+    if(frame) return frame;
+  }
   if(bot==='SCAN'){
     const tok=currentScanTok();
     token=tok?(tok.displaySymbol||tok.symbol):pick(/Skan(?:uję|uje|):\s*(\S+)/i)||pick(/token(?:ow|ów)?\b.*?(\p{L}[\p{L}\p{N}_-]{1,20})/u);
@@ -599,10 +605,10 @@ function seatState(bot){
 function stationHtml(bot, st){
   const tok=st.token||'–';
   const ini=st.token?esc(initials(st.token)):'–';
-  const scanPlate=bot==='SCAN';
+  const sievePlate=bot==='SCAN'||!!st.sieve;
   const thumb=st.image
-    ? '<div class="thumb"><img alt="" src="'+esc(st.image)+'" onerror="'+(scanPlate?'this.parentNode.classList.add(\'ph\');this.remove()':'this.parentNode.textContent=\''+ini+'\'')+'"></div>'
-    : (scanPlate&&st.usePlaceholder?'<div class="thumb ph"></div>':'<div class="thumb">'+ini+'</div>');
+    ? '<div class="thumb"><img alt="" src="'+esc(st.image)+'" onerror="'+(sievePlate?'this.parentNode.classList.add(\'ph\');this.remove()':'this.parentNode.textContent=\''+ini+'\'')+'"></div>'
+    : (sievePlate&&st.usePlaceholder?'<div class="thumb ph"></div>':'<div class="thumb">'+ini+'</div>');
   const count=st.count==null?'–':String(st.count|0);
   const dlen=count.length>=4?' d4':count.length===3?' d3':'';
   const tag=st.tag||'–';
@@ -646,16 +652,28 @@ function renderPipeline(){
       el.classList.remove('pass');
       delete el.dataset.passKey;
     }
-    if(bot==='SCAN'&&sieveFrame){
+    if(SIEVE_SEATS.includes(bot)&&sieveOf(bot).frame){
       const tok=el.querySelector('.tok');
       if(tok){tok.classList.add('swap'); setTimeout(()=>tok.classList.remove('swap'), 180);}
     }
   });
 }
 
-function clearSieveTimer(){ if(sieveTimer){ clearTimeout(sieveTimer); sieveTimer=null; } }
-function sieveTag(it, pass){
-  if(pass) return 'PASS → VET';
+function sieveOf(bot){
+  const k=String(bot||'').toUpperCase();
+  if(!sieveState[k]) sieveState[k]={batch:null, plan:null, frame:null, idx:0, timer:null, hold:false};
+  return sieveState[k];
+}
+function sieveActive(bot){
+  const st=sieveState[String(bot||'').toUpperCase()];
+  return !!(st&&st.batch&&Array.isArray(st.batch.items)&&st.batch.items.length);
+}
+function clearSieveTimer(seat){
+  const st=sieveOf(seat);
+  if(st.timer){ clearTimeout(st.timer); st.timer=null; }
+}
+function sieveTag(seat, it, pass){
+  if(pass) return PASS_TAG[seat]||'PASS';
   let r=String((it&&(it.reason||it.stage))||'–').replace(/[<>]/g,'');
   const chars=[...r];
   if(chars.length>18) r=chars.slice(0,17).join('')+'…';
@@ -668,23 +686,25 @@ function sieveCountAt(items, i){
   for(let k=0;k<upto;k++) if(TIMING.isHandoff(items[k])) n++;
   return n;
 }
-function showSieve(i, opts){
-  if(!sieveBatch||!sieveBatch.items||!sieveBatch.items[i]) return;
-  const it=sieveBatch.items[i];
+function showSieve(seat, i, opts){
+  const st=sieveOf(seat);
+  if(!st.batch||!st.batch.items||!st.batch.items[i]) return;
+  const it=st.batch.items[i];
   const pass=TIMING.isHandoff(it);
-  sieveIdx=i;
+  st.idx=i;
   const name=it.symbol||'–';
-  sieveFrame={
+  st.frame={
     token:name,
-    count:sieveCountAt(sieveBatch.items, i),
-    tag:sieveTag(it, pass),
+    count:sieveCountAt(st.batch.items, i),
+    tag:sieveTag(seat, it, pass),
     image:it.image||null,
     pass:pass,
-    usePlaceholder:!it.image
+    usePlaceholder:!it.image,
+    sieve:true
   };
   lastPipeSig='';
   renderPipeline();
-  if(opts&&opts.sound&&pass) sfxPlay('scan_pass');
+  if(opts&&opts.sound&&pass) sfxPlay(SIEVE_SFX[seat]||'scan_pass');
 }
 function cycleHasZone(ts){
   return /(?:z|[+-]\d{2}(?::?\d{2})?)$/i.test(String(ts||'').trim());
@@ -719,29 +739,27 @@ function sieveOriginMs(sv){
   const batch=Number(sv.batch_s);
   return Number.isFinite(t0)?t0+(batch>0?batch:0)*1000:NaN;
 }
-function sieveEndMs(){
-  if(!sieveBatch) return null;
-  const origin=sieveOriginMs(sieveBatch);
-  const iv=(Number(sieveBatch.interval_s)>0?Number(sieveBatch.interval_s):120)*1000;
+function sieveEndMs(seat){
+  const batch=sieveOf(seat).batch;
+  if(!batch) return null;
+  const origin=sieveOriginMs(batch);
+  const iv=(Number(batch.interval_s)>0?Number(batch.interval_s):120)*1000;
   return Number.isFinite(origin)?origin+iv:null;
 }
-function scheduleSieve(ms){
-  clearSieveTimer();
-  if(sieveHold) return;
-  sieveTimer=setTimeout(advanceSieve, Math.max(0, Math.round(ms)||0));
+function scheduleSieve(seat, ms){
+  const st=sieveOf(seat);
+  clearSieveTimer(seat);
+  if(st.hold) return;
+  st.timer=setTimeout(()=>advanceSieve(seat), Math.max(0, Math.round(ms)||0));
 }
-function advanceSieve(){
-  sieveTimer=null;
-  if(sieveHold) return;
-  if(sievePending){
-    const next=sievePending; sievePending=null;
-    startSieve(next);
-    return;
-  }
-  if(!sieveBatch||!sievePlan) return;
-  const items=sieveBatch.items, dwells=sievePlan.dwells||[];
-  const end=sieveEndMs();
-  let j=sieveIdx+1;
+function advanceSieve(seat){
+  const st=sieveOf(seat);
+  st.timer=null;
+  if(st.hold) return;
+  if(!st.batch||!st.plan) return;
+  const items=st.batch.items, dwells=st.plan.dwells||[];
+  const end=sieveEndMs(seat);
+  let j=st.idx+1;
   while(j<items.length){
     const d=dwells[j]||0;
     if(d<=0){ j++; continue; }
@@ -749,8 +767,8 @@ function advanceSieve(){
     break;
   }
   if(j>=items.length) return;
-  showSieve(j, {sound:true});
-  scheduleSieve(dwells[j]||0);
+  showSieve(seat, j, {sound:true});
+  scheduleSieve(seat, dwells[j]||0);
 }
 function holdIndex(items, hold){
   if(typeof hold==='number'&&Number.isFinite(hold)) return Math.max(0, Math.min(items.length-1, hold|0));
@@ -761,19 +779,29 @@ function holdIndex(items, hold){
   const i=items.findIndex(it=>!TIMING.isHandoff(it));
   return i<0?0:i;
 }
-function startSieve(sv){
-  clearSieveTimer();
-  sievePending=null;
-  sieveBatch=sv;
-  sievePlan=TIMING.computeDwells(sv.items, sv.interval_s||120);
-  const items=sv.items, dwells=sievePlan.dwells||[];
-  const hold=window.__SIEVE_HOLD;
+function holdPref(seat){
+  const h=window.__SIEVE_HOLD;
+  if(h&&typeof h==='object'){
+    if(Object.prototype.hasOwnProperty.call(h, seat)) return h[seat];
+    const k=String(seat||'').toLowerCase();
+    if(Object.prototype.hasOwnProperty.call(h, k)) return h[k];
+    return undefined;
+  }
+  return h;
+}
+function startSieve(seat, sv){
+  const st=sieveOf(seat);
+  clearSieveTimer(seat);
+  st.batch=sv;
+  st.plan=TIMING.computeDwells(sv.items, sv.interval_s||120);
+  const items=sv.items, dwells=st.plan.dwells||[];
+  const hold=holdPref(seat);
   if(hold){
-    sieveHold=true;
-    showSieve(holdIndex(items, hold), {sound:false});
+    st.hold=true;
+    showSieve(seat, holdIndex(items, hold), {sound:false});
     return;
   }
-  sieveHold=false;
+  st.hold=false;
   let elapsed=0;
   const t0=sieveOriginMs(sv);
   if(Number.isFinite(t0)) elapsed=Math.max(0, Date.now()-t0);
@@ -789,32 +817,41 @@ function startSieve(sv){
     dwell=dwells[i]||0;
   }
   const fresh=!finished && i===0 && into<400;
-  showSieve(i, {sound:fresh});
-  if(dwell>into) scheduleSieve(dwell-into);
+  showSieve(seat, i, {sound:fresh});
+  if(dwell>into) scheduleSieve(seat, dwell-into);
 }
-function stopSieve(){
-  clearSieveTimer();
-  sieveBatch=null; sievePlan=null; sieveFrame=null; sievePending=null; sieveHold=false; sieveIdx=0;
+function stopSieve(seat){
+  if(!seat){ for(const b of SIEVE_SEATS) stopSieve(b); return; }
+  const st=sieveOf(seat);
+  clearSieveTimer(seat);
+  st.batch=null; st.plan=null; st.frame=null; st.hold=false; st.idx=0;
   lastPipeSig='';
-  document.querySelectorAll('.station').forEach(el=>{ delete el.dataset.sig; delete el.dataset.passKey; el.classList.remove('pass'); });
+  document.querySelectorAll('.station[data-seat="'+seat+'"]').forEach(el=>{ delete el.dataset.sig; delete el.dataset.passKey; el.classList.remove('pass'); });
 }
-function noteSieve(sv){
+function noteSieve(seatOrSv, maybeSv){
+  let seat='SCAN', sv=seatOrSv;
+  if(typeof seatOrSv==='string'){ seat=seatOrSv.toUpperCase(); sv=maybeSv; }
+  if(!SIEVE_SEATS.includes(seat)) return;
+  const st=sieveOf(seat);
   if(!sv||typeof sv!=='object'||!Array.isArray(sv.items)||!sv.items.length){
-    if(sieveBatch) stopSieve();
+    if(st.batch) stopSieve(seat);
     return;
   }
   const id=String(sv.batch_id||sv.cycleTs||'');
-  const cur=sieveBatch?String(sieveBatch.batch_id||sieveBatch.cycleTs||''):'';
-  if(sieveBatch&&id&&id===cur) return;
-  startSieve(sv);
+  const cur=st.batch?String(st.batch.batch_id||st.batch.cycleTs||''):'';
+  if(st.batch&&id&&id===cur) return;
+  startSieve(seat, sv);
 }
-function holdSieve(which){
-  if(!sieveBatch) return null;
-  sieveHold=true;
-  clearSieveTimer();
-  const i=holdIndex(sieveBatch.items, which);
-  showSieve(i, {sound:false});
-  return sieveFrame;
+function holdSieve(which, seat){
+  let bot='SCAN', hold=which;
+  if(typeof which==='string' && SIEVE_SEATS.includes(which.toUpperCase())){ bot=which.toUpperCase(); hold=seat; }
+  const st=sieveOf(bot);
+  if(!st.batch) return null;
+  st.hold=true;
+  clearSieveTimer(bot);
+  const i=holdIndex(st.batch.items, hold);
+  showSieve(bot, i, {sound:false});
+  return st.frame;
 }
 
 const SFX_GAIN={scan_pass:0.600, vet_pass:0.636, book_pass:0.672, size_pass:0.708, fills_pass:0.744, risk_profit:0.900, risk_loss:0.900};
@@ -1108,10 +1145,16 @@ socket.on('scan', d=>{
   if(!d||typeof d!=='object') return;
   scan=d;
   if(d.lastFeedAt) feedAt=d.lastFeedAt;
-  if(Object.prototype.hasOwnProperty.call(d,'scan_sieve')) noteSieve(d.scan_sieve);
+  if(Object.prototype.hasOwnProperty.call(d,'scan_sieve')) noteSieve('SCAN', d.scan_sieve);
   lastPipeSig='';
   renderPipeline();
   renderGauges();
+});
+socket.on('sieve', d=>{
+  if(!d||typeof d!=='object') return;
+  const seat=String(d.seat||'').toUpperCase();
+  if(!SIEVE_SEATS.includes(seat)) return;
+  noteSieve(seat, d);
 });
 socket.on('posEvents', evs=>{posEvents=Array.isArray(evs)?evs:[]; statsReady=true; lastEvSig=''; renderEvents(); renderGauges();});
 socket.on('deskFx', ev=>{
@@ -1119,7 +1162,7 @@ socket.on('deskFx', ev=>{
   if(ev.kind==='stage'){
     const bot=String(ev.bot||'').toUpperCase();
     const lv=ev.level|0;
-    if(lv===2&&bot==='VET') sfxPlay('vet_pass');
+    if(lv===2&&bot==='VET'){ if(!sieveActive('VET')) sfxPlay('vet_pass'); }
     else if(lv===3&&bot==='BOOK') sfxPlay('book_pass');
     else if(lv===4) sfxPlay('fills_pass');
   }else if(ev.kind==='close'){
@@ -1174,7 +1217,17 @@ async function loadHistory(){
     if(port&&!port.empty) portfolio=port;
     if(tick) ticker=tick;
     if(sc&&sc.tokens) scan=sc;
-    if(sc&&Object.prototype.hasOwnProperty.call(sc,'scan_sieve')) noteSieve(sc.scan_sieve);
+    let notedScan=false;
+    if(feed&&feed.sieves&&typeof feed.sieves==='object'){
+      for(const seat of SIEVE_SEATS){
+        const k=seat.toLowerCase();
+        if(Object.prototype.hasOwnProperty.call(feed.sieves, k)){
+          noteSieve(seat, feed.sieves[k]);
+          if(seat==='SCAN') notedScan=true;
+        }
+      }
+    }
+    if(!notedScan&&sc&&Object.prototype.hasOwnProperty.call(sc,'scan_sieve')) noteSieve('SCAN', sc.scan_sieve);
     if(bev&&typeof bev==='object') botEvents=bev;
     if((!Object.keys(positions).length)&&Array.isArray(pos)&&pos.length) takePositions(pos);
     statsReady=true;
@@ -1282,7 +1335,8 @@ setInterval(()=>{
 
 paintAudio();
 window.AO2={positions:()=>positions, portfolio:()=>portfolio, scan:()=>scan, fixture:()=>fixture, render:renderAll,
-  sieve:()=>sieveFrame, dwells:()=>sievePlan, sieveOriginMs, holdSieve, noteSieve, sfxLog:()=>sfxLog.slice(), speaker:()=>speakerOn,
+  sieve:(seat)=>sieveOf(seat||'SCAN').frame, dwells:(seat)=>sieveOf(seat||'SCAN').plan, sieveOriginMs, holdSieve, noteSieve, sieveActive,
+  sfxLog:()=>sfxLog.slice(), speaker:()=>speakerOn,
   gauges:()=>Array.from(document.querySelectorAll('#gauges .mano')).map(el=>{
     const n=needleState.get(el.querySelector('.needle'));
     const val=el.querySelector('.mano-plaque .val');

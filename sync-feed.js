@@ -100,7 +100,9 @@ function build0(){const f=path.join(DESK,'office-feed.json');const own=readJSON(
  for(const r of ROLE_FILES){let lines=[];try{lines=fs.readFileSync(path.join(DESK,'logs',r+'.log'),'utf8').trim().split('\n').slice(-60);}catch{}
   for(const l of lines){let e;try{e=JSON.parse(l);}catch{continue;}if(!e||SKIP.has(e.type)||Date.parse(e.ts)<since)continue;acts.push({ts:e.ts,bot:String(e.role||r).toUpperCase(),text:text(e),kind:e.type});}}
  acts.sort((a,c)=>Date.parse(a.ts)-Date.parse(c.ts));
- return {updatedAt:b.updatedAt||new Date().toISOString(),positions,activity:acts.slice(-25),top10:b.top10,top10_cycle_ts:b.top10_cycle_ts,top10_rule:b.top10_rule,source:'board.json+logs'};}
+ const out={updatedAt:b.updatedAt||new Date().toISOString(),positions,activity:acts.slice(-25),top10:b.top10,top10_cycle_ts:b.top10_cycle_ts,top10_rule:b.top10_rule,source:'board.json+logs'};
+ for(const k of ['scan_sieve','vet_sieve','book_sieve','size_sieve','fills_sieve']) if(b&&Object.prototype.hasOwnProperty.call(b,k)) out[k]=b[k];
+ return out;}
 const state={};
 async function push(t,body,hash){const s=state[t.name]||(state[t.name]={hash:null,at:0});
  if(s.hash===hash&&Date.now()-s.at<HEARTBEAT)return;let tok;try{tok=fs.readFileSync(t.tokenFile,'utf8').trim();}catch{return log(`${t.name}: brak pliku tokenu`);}

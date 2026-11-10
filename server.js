@@ -6,7 +6,7 @@ let lastFeedAt=0;
 const deskFx=createDeskFx({io});
 const scan=createScan({io,extra:()=>({lastFeedAt:lastFeedAt||null}),onEnrich:()=>refreshPositionEnrich()});
 scan.start();
-app.use(express.json({limit:'1mb'})); // scan_sieve is up to 200 items on top of the rest of the feed
+app.use(express.json({limit:'1mb'})); // per-seat sieves are up to 200 items on top of the rest of the feed
 function gzipJson(req,res,next){
   const orig=res.json.bind(res);
   res.json=function(body){
@@ -194,7 +194,10 @@ function cleanImage(v){
   return s;
 }
 const SIEVE_CAP=200;
-const SIEVE_STAGES=new Set(['cheap_reject','buysell_dropped','reject','soft_pass','hard_pass','handoff']);
+// Known stage slugs. Anything else still passes through as a lowercase slug.
+const SIEVE_STAGES=new Set(['cheap_reject','buysell_dropped','reject','soft_pass','hard_pass','handoff','cooldown','hard_reject','soft_reject','soft_missing','held','quarantine','size_zero','fee_floor']);
+const SIEVE_SEATS=['scan','vet','book','size','fills'];
+const seatSieves={scan:null,vet:null,book:null,size:null,fills:null};
 function cleanSieve(raw){
   if(!raw||typeof raw!=='object'||Array.isArray(raw)) return null;
   const numOr=v=>{const n=typeof v==='number'?v:+v; return (typeof v==='number'||(typeof v==='string'&&v.trim()!==''))&&Number.isFinite(n)?n:null;};
@@ -224,6 +227,19 @@ function cleanSieve(raw){
     handoff_n:handN==null?items.filter(x=>x.handoff).length:Math.max(0, handN|0),
     preview:raw.preview===true, cap, items
   };
+}
+function sieveSnapshot(){return {scan:seatSieves.scan,vet:seatSieves.vet,book:seatSieves.book,size:seatSieves.size,fills:seatSieves.fills};}
+function sieveWire(seat, sv){return sv?Object.assign({seat}, sv):{seat, items:null};}
+function storeSieve(seat, raw){
+  if(!SIEVE_SEATS.includes(seat)) return false;
+  const next=raw==null?null:cleanSieve(raw);
+  const sig=next?JSON.stringify(next):'';
+  const prevSig=seatSieves[seat]?JSON.stringify(seatSieves[seat]):'';
+  if(sig===prevSig) return false;
+  seatSieves[seat]=next;
+  io.emit('sieve', sieveWire(seat, next));
+  if(seat==='scan') scan.setSieve(next);
+  return true;
 }
 function livePnl(p){const b=p.pnlBase;if(b==null||!isFinite(b)||!b||p.price==null||!isFinite(+p.price))return null;return (p.price-b)/b*100*(p.side==='SHORT'?-1:1);}
 const enrSig=new WeakMap();
@@ -285,7 +301,7 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
   announce.sort(chatBurstSort);
   announce.forEach((a,i)=>setTimeout(()=>{const tm=/^\d\d:\d\d /.test(a.text)?a.text.slice(0,6):'',bt=tm?a.text.slice(6):a.text;io.emit('chat',{system:true,bot:a.bot,text:`${tm}🤖 ${a.bot}: ${bt}`,kind:a.kind||'',scope:'global',ts:Date.now()});io.emit('bubble',{id:'bot-'+a.bot,text:bt});bots.nudge(a.bot);},i*1500));
   if(b.top10&&Array.isArray(b.top10)&&b.top10.length){desk={...(desk||{}),top10:b.top10.slice(0,30),top10_cycle_ts:b.top10_cycle_ts,top10_prev:Array.isArray(b.top10_prev)?b.top10_prev.slice(0,30):null,top10_prev_cycle_ts:b.top10_prev_cycle_ts||null,top10_rule:b.top10_rule,updatedAt:b.updatedAt};publishDesk();}
-  if(Object.prototype.hasOwnProperty.call(b,'scan_sieve')) scan.setSieve(b.scan_sieve==null?null:cleanSieve(b.scan_sieve));
+  for(const seat of SIEVE_SEATS){const key=seat+'_sieve'; if(Object.prototype.hasOwnProperty.call(b,key)) storeSieve(seat, b[key]);}
   if(b.news&&typeof b.news==='object'&&Array.isArray(b.news.items)){const items=b.news.items.slice(0,20).map(x=>({title:String(x&&x.title||'').replace(/[<>]/g,'').slice(0,140),source:String(x&&x.source||'').replace(/[<>]/g,'').slice(0,40),category:String(x&&x.category||'').slice(0,20),publishedAt:+(x&&x.publishedAt)||null})).filter(x=>x.title);
     if(items.length){feedNews={items,updatedAt:Date.parse(b.news.updatedAt)||Date.now(),error:null,source:'feed:'+String(b.news.source||'desk').slice(0,30)};io.emit('ticker',tickerOut());}}
   if(b.botEvents&&typeof b.botEvents==='object'){const ev={};for(const n of BOT_NAMES){const l=b.botEvents[n];ev[n]=(Array.isArray(l)?l:[]).slice(0,10).map(x=>({ts:String(x&&x.ts||'').slice(0,40),
@@ -297,14 +313,22 @@ function applyFeed(b){const errs=[];if(!b||typeof b!=='object')return {error:['b
 app.post('/api/feed',auth,(q,r)=>{const res=applyFeed(q.body);if(res.error)return r.status(400).json({error:'Błędne dane',details:res.error});r.json({ok:true,...res});});
 const noTm=t=>String(t||'').replace(/^\d\d:\d\d /,'');
 const dedupAdj=l=>{const o=[];for(const a of l){const p=o[o.length-1];if(p&&p.bot===a.bot&&noTm(p.text)===noTm(a.text))o[o.length-1]=a;else o.push(a);}return o;};
-app.get('/api/feed',(q,r)=>sendCachedJson(q,r,{lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:dedupAdj(feedActivity).slice(-100),posEvents}));
+app.get('/api/feed',(q,r)=>sendCachedJson(q,r,{lastFeedAt:lastFeedAt||null,positions:Object.values(positions).filter(p=>p.feed),activity:dedupAdj(feedActivity).slice(-100),posEvents,sieves:sieveSnapshot()}));
 app.get('/api/scan',(q,r)=>{try{r.json(scan.snapshot());}catch(e){r.status(500).json({error:'scan'});}});
+app.get('/api/sieve',(q,r)=>{
+  const seat=String(q.query.seat||'').toLowerCase();
+  if(!seat) return r.json(sieveSnapshot());
+  if(!SIEVE_SEATS.includes(seat)) return r.status(400).json({error:'seat'});
+  r.json(sieveWire(seat, seatSieves[seat]));
+});
+app.get('/api/vet',(q,r)=>r.json(sieveWire('vet', seatSieves.vet)));
 app.get('/api/bot-events',(q,r)=>r.json(bots.events()));
 app.get('/api/portfolio',(q,r)=>sendCachedJson(q,r,portfolio||{empty:true,trades:0,series:[],recent:[],note:'brak historii portfela (feed jeszcze nie przysłał danych)'}));
 app.get('/api/desk',(q,r)=>r.json(desk||{error:'brak board.json'}));
 io.on('connection',s=>{
   s.emit('top10',deskTop10()||top10);
   s.emit('scan',scan.snapshot());
+  for(const seat of SIEVE_SEATS) s.emit('sieve', sieveWire(seat, seatSieves[seat]));
   s.emit('positions',allPositions());
   if(portfolio)s.emit('portfolio',portfolio);s.emit('posEvents',posEvents);
   s.emit('ticker',tickerOut());
