@@ -2,6 +2,7 @@ const {io}=require('socket.io-client');const U='http://localhost:3000';
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{const a=io(U),b=io(U);const got={a:[],b:[]};let ok=true;const chk=(c,m)=>{console.log((c?'PASS':'FAIL')+' '+m);ok=ok&&c;};
 const ST=require('./public/v2/sieve-timing.js');
+const VETFIX=require('./test/fixtures/vet/fixture-vet-batch.json');
 const sumD=a=>a.reduce((x,y)=>x+y,0);
 const near=(x,y,e=1e-4)=>Math.abs(x-y)<=e;
 {
@@ -17,6 +18,13 @@ const near=(x,y,e=1e-4)=>Math.abs(x-y)<=e;
   const t=ST.computeDwells(Array.from({length:5},()=>({handoff:true})),10);
   chk(t.handMs<2500&&near(sumD(t.dwells),t.budget),'dwell: handoff poniżej 2.5s tylko gdy inaczej paczka przekroczyłaby budżet');
   chk(ST.isHandoff({handoff:true})&&!ST.isHandoff({handoff:false,stage:'soft_pass'}),'dwell: PASS to handoff=true, samo soft_pass nie');
+  const live=ST.computeDwells(VETFIX.items, VETFIX.interval_s_live);
+  chk(live.handMs===4000&&near(live.rejMs,19624)&&live.skipped===0,'VET dwell 111s: odrzut 19.624s, PASS 4s, bez skipa');
+  const typical=ST.computeDwells(VETFIX.items, 134);
+  chk(typical.handMs===4000&&near(typical.rejMs,23856)&&typical.skipped===0,'VET dwell 134s: odrzut 23.856s, PASS 4s');
+  const preview=ST.computeDwells(VETFIX.items, VETFIX.preview_interval_s);
+  chk(preview.handMs===4000&&near(preview.rejMs,2512)&&preview.skipped===0,'VET dwell podgląd 18s: odrzut 2.512s, PASS 4s');
+  chk(VETFIX.items.filter(ST.isHandoff).length===1&&ST.isHandoff(VETFIX.items.find(t=>t.symbol==='X'))&&!ST.isHandoff({handoff:false,stage:'hard_pass'}),'fixture VET: nixie liczy tylko handoff (X), nie hard_pass');
 }
 for(const [n,s] of [['a',a],['b',b]]){s.onAny((e,d)=>got[n].push([e,d]));}
 a.emit('join',{name:'Alicja',color:'#00f0ff',sprite:1});await wait(200);b.emit('join',{name:'Bartek',color:'#39ff14',sprite:2});await wait(300);
@@ -129,10 +137,60 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  fr=await fp({positions:[],activity:[],scan_sieve:null});
  sc2=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
  chk(sc2.scan_sieve==null&&sc2.total===1,'scan_sieve:null czyści sito, top-12 zostaje');
+ {
+  const nSieve=fev.length;
+  const vetPayload={batch_id:VETFIX.batch_id,cycleTs:VETFIX.cycleTs,interval_s:VETFIX.interval_s_live,batch_s:VETFIX.batch_s,total:VETFIX.total+4,handoff_n:VETFIX.handoff_n,items:VETFIX.items.concat([
+    {symbol:'FEE',stage:'fee_floor',reason:'fee',handoff:false},
+    {symbol:'ZERO',stage:'size_zero',reason:'zero',handoff:false},
+    {symbol:'CUSTOM',stage:'Custom_Slug',reason:'x',handoff:false},
+    {symbol:'HARD',stage:'hard_pass',reason:'hard pass',handoff:false}
+  ])};
+  fr=await fp({positions:[],activity:[],vet_sieve:vetPayload,book_sieve:{batch_id:'book-1',cycleTs:VETFIX.cycleTs,interval_s:30,batch_s:1,total:1,handoff_n:1,items:[{symbol:'B1',stage:'soft_pass',reason:'ok',handoff:true}]}});
+  chk(fr.s===200,'Feed z vet_sieve i book_sieve -> 200');
+  await wait(300);
+  const svAll=await fetch('http://localhost:3999/api/sieve').then(r=>r.json());
+  const svVet=await fetch('http://localhost:3999/api/sieve?seat=vet').then(r=>r.json());
+  const apiVet=await fetch('http://localhost:3999/api/vet').then(r=>r.json());
+  chk(svVet&&svVet.seat==='vet'&&svVet.batch_id===VETFIX.batch_id&&svVet.interval_s===111&&svVet.handoff_n===1&&svVet.items.length===10,'GET /api/sieve?seat=vet niesie partię VET');
+  chk(JSON.stringify(apiVet)===JSON.stringify(svVet),'GET /api/vet jest aliasem /api/sieve?seat=vet');
+  chk(svAll&&svAll.vet&&svAll.vet.batch_id===VETFIX.batch_id&&svAll.book&&svAll.book.batch_id==='book-1'&&svAll.size==null&&svAll.fills==null,'GET /api/sieve trzyma ostatnie sito per seat');
+  const bySym={}; for(const it of svVet.items) bySym[it.symbol]=it;
+  chk(bySym.FAIR&&bySym.FAIR.stage==='cooldown'&&bySym.FAIR.handoff===false&&bySym.OnlyCats&&bySym.OnlyCats.stage==='cooldown','stage cooldown przechodzi');
+  chk(bySym.Pepetide&&bySym.Pepetide.stage==='hard_reject'&&bySym.Pepetide.reason==='top_wallet=0.1622'&&bySym.DERP404&&bySym.DERP404.stage==='hard_reject','hard_reject i powód zostają');
+  chk(bySym.X&&bySym.X.stage==='soft_pass'&&bySym.X.handoff===true,'soft_pass z handoff=true zostaje przekazaniem do BOOK');
+  chk(bySym.HARD&&bySym.HARD.stage==='hard_pass'&&bySym.HARD.handoff===false,'hard_pass bez handoff nie jest przekazaniem');
+  chk(bySym.FEE&&bySym.FEE.stage==='fee_floor'&&bySym.ZERO&&bySym.ZERO.stage==='size_zero'&&bySym.CUSTOM&&bySym.CUSTOM.stage==='custom_slug','fee_floor, size_zero i nieznany stage jako slug');
+  chk(fev.slice(nSieve).some(([e,d])=>e==='sieve'&&d.seat==='vet'&&d.batch_id===VETFIX.batch_id)&&fev.slice(nSieve).some(([e,d])=>e==='sieve'&&d.seat==='book'),'Socket sieve niesie {seat,...}');
+  let scKeep=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
+  chk(scKeep.total===1&&scKeep.scan_sieve==null,'vet_sieve nie zmienia /api/scan ani top-12');
+  fr=await fp({positions:[],activity:[],scan_sieve:sieve});
+  scKeep=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
+  const svAfter=await fetch('http://localhost:3999/api/sieve').then(r=>r.json());
+  chk(scKeep.scan_sieve&&scKeep.scan_sieve.batch_id==='20261109T232157'&&JSON.stringify(svAfter.scan)===JSON.stringify(scKeep.scan_sieve)&&svAfter.vet.batch_id===VETFIX.batch_id,'scan_sieve zostaje na /api/scan, vet_sieve bez zmian');
+  chk(fev.slice(nSieve).some(([e,d])=>e==='scan'&&d.scan_sieve&&d.scan_sieve.batch_id==='20261109T232157'),'Socket scan przy scan_sieve bez zmian');
+  const badSeat=await fetch('http://localhost:3999/api/sieve?seat=nope').then(async r=>({s:r.status,j:await r.json()}));
+  chk(badSeat.s===400,'GET /api/sieve?seat=nope -> 400');
+  const nc=io('http://localhost:3999'); const nev=[]; nc.onAny((e,d)=>nev.push([e,d]));
+  await new Promise(r=>nc.on('connect',r)); await wait(400);
+  chk(nev.some(([e,d])=>e==='sieve'&&d.seat==='vet'&&d.batch_id===VETFIX.batch_id)&&nev.some(([e,d])=>e==='sieve'&&d.seat==='book'&&d.batch_id==='book-1')&&nev.some(([e,d])=>e==='scan'&&d.scan_sieve&&d.scan_sieve.batch_id==='20261109T232157'),'Nowe połączenie dostaje sita per seat i niezmieniony scan');
+  nc.disconnect();
+  const feedNow=await fetch('http://localhost:3999/api/feed').then(r=>r.json());
+  chk(feedNow.sieves&&feedNow.sieves.vet&&feedNow.sieves.vet.batch_id===VETFIX.batch_id&&feedNow.sieves.book&&feedNow.sieves.book.batch_id==='book-1','GET /api/feed niesie sieves (stan początkowy)');
+  fr=await fp({positions:[],activity:[]});
+  const kept=await fetch('http://localhost:3999/api/vet').then(r=>r.json());
+  chk(kept&&kept.batch_id===VETFIX.batch_id,'Feed bez pola vet_sieve zostawia poprzednie sito');
+  fr=await fp({positions:[],activity:[],vet_sieve:null});
+  const cleared=await fetch('http://localhost:3999/api/vet').then(r=>r.json());
+  const stillBook=await fetch('http://localhost:3999/api/sieve?seat=book').then(r=>r.json());
+  chk(cleared&&cleared.seat==='vet'&&cleared.items==null&&stillBook.batch_id==='book-1','vet_sieve:null czyści VET i nie rusza BOOK');
+  fr=await fp({positions:[],activity:[],book_sieve:null,scan_sieve:null});
+  const emptyAll=await fetch('http://localhost:3999/api/sieve').then(r=>r.json());
+  chk(emptyAll.scan==null&&emptyAll.vet==null&&emptyAll.book==null&&emptyAll.size==null&&emptyAll.fills==null,'puste sita per seat po czyszczeniu');
+ }
  // Playback: sieve arrives batch_s after cycleTs, zoneless stamp is Europe/Warsaw.
  {
   const puppeteer=require('puppeteer-core');
-  const br=await puppeteer.launch({executablePath:process.env.CHROME||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage','--hide-scrollbars']});
+  const br=await puppeteer.launch({executablePath:process.env.CHROME||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage','--hide-scrollbars','--autoplay-policy=no-user-gesture-required']});
   try{
    const pg=await br.newPage();
    pg.on('pageerror',e=>console.log('sieve page',e.message));
@@ -196,6 +254,78 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
    chk(restarted.token==='B0'&&!restarted.pass,'po oknie nowy batch wraca na B0 zamiast zamarzać na SOL (jest '+(restarted.token||'—')+')');
    const moved=await untilScan(v=>v.pass&&v.token==='B2',8000);
    chk(moved.pass&&moved.token==='B2','po restarcie sito leci do PASS, nie stoi na pierwszej klatce (jest '+(moved.token||'—')+(moved.pass?' PASS':'')+')');
+   const readSeat=seat=>pg.evaluate(seat=>{
+     const el=document.querySelector('[data-seat="'+seat+'"]');
+     if(!el) return {token:'',pass:false,tag:'',count:'',stamp:''};
+     const name=el.querySelector('.tname'), tag=el.querySelector('.tag .txt'), dig=el.querySelector('.nixie .digit'), lab=el.querySelector('.stamp .lab');
+     return {token:name?name.textContent:'', pass:el.classList.contains('pass'), tag:tag?tag.textContent:'', count:dig?dig.textContent:'', stamp:lab?lab.textContent:''};
+   }, seat);
+   const untilSeat=(seat, pred, ms)=>new Promise(async r=>{
+     const end=Date.now()+ms; let v=await readSeat(seat);
+     while(!pred(v)&&Date.now()<end){ await wait(40); v=await readSeat(seat); }
+     r(v);
+   });
+   const tags=await pg.evaluate(()=>{
+     const now=new Date().toISOString();
+     const one=(seat, sym)=>({batch_id:'tag-'+seat, cycleTs:now, interval_s:60, batch_s:0, total:1, handoff_n:1, items:[{symbol:sym, stage:'soft_pass', reason:'soft pass', handoff:true}]});
+     window.AO2.noteSieve('BOOK', one('BOOK','BTOK'));
+     window.AO2.holdSieve('BOOK','pass');
+     window.AO2.noteSieve('SIZE', one('SIZE','STOK'));
+     window.AO2.holdSieve('SIZE','pass');
+     window.AO2.noteSieve('FILLS', one('FILLS','FTOK'));
+     window.AO2.holdSieve('FILLS','pass');
+     const read=seat=>{const el=document.querySelector('[data-seat="'+seat+'"] .tag .txt'); return el?el.textContent:'';};
+     return {BOOK:read('BOOK'), SIZE:read('SIZE'), FILLS:read('FILLS')};
+   });
+   chk(tags.BOOK==='PASS → SIZE'&&tags.SIZE==='PASS → FILLS'&&tags.FILLS==='PASS → RISK','tagi PASS kolejnych seatów: SIZE, FILLS, RISK (jest '+JSON.stringify(tags)+')');
+   await pg.click('#audioBtn');
+   await wait(200);
+   const batch_s_v=2;
+   const tV=Date.now();
+   const vetPlay={batch_id:'vet-play-'+tV, cycleTs:new Date(tV-batch_s_v*1000).toISOString(), interval_s:VETFIX.preview_interval_s, batch_s:batch_s_v, total:VETFIX.items.length, handoff_n:1, items:VETFIX.items.map(it=>({symbol:it.symbol,address:it.address,chain:it.chain,mcap_usd:it.mcap_usd,marketCap:it.marketCap,stage:it.stage,reason:it.reason,handoff:it.handoff}))};
+   const passBefore=await pg.evaluate(()=>window.AO2.sfxLog().filter(x=>x.id==='vet_pass').length);
+   posted=await fp({positions:[],activity:[],vet_sieve:vetPlay});
+   chk(posted.s===200,'playback VET: fixture 20261110T113353');
+   const pep=await untilSeat('VET', v=>v.token==='Pepetide', 8000);
+   chk(pep.token==='Pepetide'&&!pep.pass&&pep.stamp===''&&pep.count==='0'&&pep.tag==='top_wallet=0.1622','VET odrzut Pepetide: nixie 0, powód, bez PASS (jest '+(pep.token||'—')+' / '+(pep.tag||'')+' / '+(pep.count||'')+')');
+   const xpass=await untilSeat('VET', v=>v.pass&&v.token==='X', 16000);
+   chk(xpass.pass&&xpass.token==='X'&&xpass.stamp==='PASS'&&xpass.count==='1'&&xpass.tag==='PASS → BOOK','VET playback fixture dochodzi do PASS → BOOK na X, nixie 1 (jest '+(xpass.token||'—')+' '+(xpass.tag||'')+' '+(xpass.count||'')+(xpass.pass?' PASS':'')+')');
+   const passAfter=await pg.evaluate(()=>window.AO2.sfxLog().filter(x=>x.id==='vet_pass').length);
+   chk(passAfter===passBefore+1,'klatka PASS VET puszcza vet_pass (gain ze słownika, głośnik włączony)');
+   posted=await fp({positions:[],activity:[],vet_sieve:{batch_id:'vet-quiet-'+Date.now(), cycleTs:new Date().toISOString(), interval_s:120, batch_s:0, total:1, handoff_n:0, items:[{symbol:'QUIET', stage:'hard_reject', reason:'top_wallet=0.9', handoff:false}]}});
+   const quiet=await untilSeat('VET', v=>v.token==='QUIET', 4000);
+   chk(quiet.token==='QUIET'&&!quiet.pass,'sito VET jest aktywne na odrzucie');
+   const held=await pg.evaluate(()=>window.AO2.sfxLog().filter(x=>x.id==='vet_pass').length);
+   posted=await fp({positions:[],activity:[{ts:new Date().toISOString(),bot:'VET',text:'Przepuszczam ZEDTOK',kind:'soft.pass'}]});
+   await wait(700);
+   const held2=await pg.evaluate(()=>window.AO2.sfxLog().filter(x=>x.id==='vet_pass').length);
+   chk(held2===held,'deskFx level 2 nie puszcza vet_pass, gdy sito VET jest aktywne');
+   posted=await fp({positions:[],activity:[{ts:new Date().toISOString(),bot:'VET',text:'Przepuszczam YEDTOK',kind:'soft.pass'}],vet_sieve:null});
+   await wait(700);
+   const held3=await pg.evaluate(()=>window.AO2.sfxLog().filter(x=>x.id==='vet_pass').length);
+   const fell=await readSeat('VET');
+   chk(held3===held2+1,'bez vet_sieve deskFx level 2 znowu puszcza vet_pass');
+   chk(!fell.pass&&fell.tag!=='PASS → BOOK','bez vet_sieve VET wraca do płytki z aktywności');
+   const counted=await pg.evaluate(()=>{
+     const now=new Date().toISOString();
+     window.AO2.noteSieve('VET', {batch_id:'vet-count', cycleTs:now, interval_s:40, batch_s:0, total:2, handoff_n:1, items:[
+       {symbol:'HARDY', stage:'hard_pass', reason:'hard pass', handoff:false},
+       {symbol:'X2', stage:'soft_pass', reason:'soft pass', handoff:true}
+     ]});
+     window.AO2.holdSieve('VET', 0);
+     const dig=()=>{const el=document.querySelector('[data-seat="VET"]'); return {count:el.querySelector('.nixie .digit').textContent, pass:el.classList.contains('pass'), token:el.querySelector('.tname').textContent, tag:el.querySelector('.tag .txt').textContent};};
+     const a=dig();
+     window.AO2.holdSieve('VET', 'pass');
+     return {a, b:dig()};
+   });
+   chk(counted.a.token==='HARDY'&&counted.a.count==='0'&&!counted.a.pass&&counted.b.token==='X2'&&counted.b.count==='1'&&counted.b.pass&&counted.b.tag==='PASS → BOOK','nixie VET liczy handoff, nie hard_pass');
+   const now3=Date.now();
+   const vetLateIv=24;
+   const vetLateTs=new Date(now3-(vetLateIv+30+batch_s_v)*1000).toISOString();
+   posted=await fp({positions:[],activity:[],vet_sieve:{batch_id:'vet-late-'+now3, cycleTs:vetLateTs, interval_s:vetLateIv, batch_s:batch_s_v, total:VETFIX.items.length, handoff_n:1, items:vetPlay.items}});
+   chk(posted.s===200,'playback VET: spóźniona partia wraca na start');
+   const restartedV=await untilSeat('VET', v=>v.token==='FAIR'||v.token==='HWAN', 4000);
+   chk(restartedV.token==='FAIR'&&!restartedV.pass,'po oknie VET wraca na FAIR, nie zostaje na końcu (jest '+(restartedV.token||'—')+')');
   }finally{ await br.close(); }
  }
  fr=await fp({positions:[{id:'U-1',bot:'RISK',symbol:'Łódź',chain:'solana',side:'LONG',size:10,entry:1,price:1.1,mode:'SHADOW'}],activity:[]});
@@ -307,7 +437,7 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  pf=await fetch('http://localhost:3999/api/portfolio').then(r=>r.json());
  chk(fr.s===200&&pf.fees===12.5,'portfolio.fees opcjonalne przechodzi');
  const v2=await fetch('http://localhost:3999/v2').then(async r=>({s:r.status,t:await r.text()}));
- chk(v2.s===200&&/ARCADE OFFICE/.test(v2.t)&&/v2\.js\?v=12/.test(v2.t)&&/sieve-timing\.js\?v=12/.test(v2.t)&&/v2\.css\?v=12/.test(v2.t),'GET /v2 serwuje nową tablicę (cache v=12)');
+ chk(v2.s===200&&/ARCADE OFFICE/.test(v2.t)&&/v2\.js\?v=13/.test(v2.t)&&/sieve-timing\.js\?v=13/.test(v2.t)&&/v2\.css\?v=13/.test(v2.t),'GET /v2 serwuje nową tablicę (cache v=13)');
  const home=await fetch('http://localhost:3999/').then(async r=>({s:r.status,t:await r.text()}));
  chk(home.s===200&&/game\.js/.test(home.t)&&!/v2\.js/.test(home.t),'GET / nadal serwuje starą tablicę');
  fc.disconnect();
