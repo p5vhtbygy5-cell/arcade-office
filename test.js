@@ -129,6 +129,75 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  fr=await fp({positions:[],activity:[],scan_sieve:null});
  sc2=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
  chk(sc2.scan_sieve==null&&sc2.total===1,'scan_sieve:null czyści sito, top-12 zostaje');
+ // Playback: sieve arrives batch_s after cycleTs, zoneless stamp is Europe/Warsaw.
+ {
+  const puppeteer=require('puppeteer-core');
+  const br=await puppeteer.launch({executablePath:process.env.CHROME||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage','--hide-scrollbars']});
+  try{
+   const pg=await br.newPage();
+   pg.on('pageerror',e=>console.log('sieve page',e.message));
+   await pg.setViewport({width:1920,height:1080,deviceScaleFactor:1});
+   await pg.goto('http://127.0.0.1:3999/v2',{waitUntil:'domcontentloaded',timeout:30000});
+   await pg.waitForFunction(()=>window.AO2&&typeof window.AO2.sieveOriginMs==='function',{timeout:10000});
+   await pg.waitForFunction(()=>{const el=document.getElementById('feedAge'); return !!(el&&el.textContent&&!/—/.test(el.textContent));},{timeout:10000});
+   const origins=await pg.evaluate(()=>({
+    winter:window.AO2.sieveOriginMs({cycleTs:'2026-11-10T08:50:47',batch_s:118}),
+    summer:window.AO2.sieveOriginMs({cycleTs:'2026-07-10T08:50:47',batch_s:10}),
+    zoned:window.AO2.sieveOriginMs({cycleTs:'2026-11-09T23:21:57+01:00',batch_s:121.7}),
+    zulu:window.AO2.sieveOriginMs({cycleTs:'2026-11-10T07:50:47Z',batch_s:118})
+   }));
+   const winter=Date.parse('2026-11-10T08:50:47+01:00')+118000;
+   chk(origins.winter===winter,'sieveOrigin: cycleTs bez strefy (listopad) to Europe/Warsaw +01:00 + batch_s');
+   chk(origins.summer===Date.parse('2026-07-10T08:50:47+02:00')+10000,'sieveOrigin: cycleTs bez strefy (lipiec, CEST) to +02:00 + batch_s');
+   chk(origins.zoned===Date.parse('2026-11-09T23:21:57+01:00')+121.7*1000,'sieveOrigin: cycleTs ze strefą zostaje, batch_s jest dodany');
+   chk(origins.zulu===winter,'sieveOrigin: znacznik Z nie jest przesuwany na Warszawę');
+   const wall=ms=>{
+    const fmt=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Warsaw',hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const g={}; for(const p of fmt.formatToParts(new Date(ms))) if(p.type!=='literal') g[p.type]=p.value;
+    const hh=String((+g.hour)%24).padStart(2,'0');
+    return g.year+'-'+g.month+'-'+g.day+'T'+hh+':'+g.minute+':'+g.second;
+   };
+   const readScan=()=>pg.evaluate(()=>{
+    const el=document.querySelector('[data-seat="SCAN"]');
+    if(!el) return {token:'',pass:false,tag:''};
+    const name=el.querySelector('.tname'), tag=el.querySelector('.tag .txt');
+    return {token:name?name.textContent:'', pass:el.classList.contains('pass')&&!!el.querySelector('.stamp .lab'), tag:tag?tag.textContent:''};
+   });
+   const untilScan=(pred,ms)=>new Promise(async r=>{
+    const end=Date.now()+ms; let v=await readScan();
+    while(!pred(v)&&Date.now()<end){ await wait(40); v=await readScan(); }
+    r(v);
+   });
+   const batch_s=118, interval_s=24;
+   const items=[
+    {symbol:'A0',stage:'cheap_reject',reason:'cheap',handoff:false},
+    {symbol:'A1',stage:'cheap_reject',reason:'holders',handoff:false},
+    {symbol:'MILES',stage:'soft_pass',reason:'handoff',handoff:true},
+    {symbol:'SOL',stage:'cheap_reject',reason:'cheap',handoff:false}
+   ];
+   const t0=Date.now();
+   let posted=await fp({positions:[],activity:[],scan_sieve:{batch_id:'play-'+t0,cycleTs:wall(t0-batch_s*1000),interval_s,batch_s,total:4,handoff_n:1,items}});
+   chk(posted.s===200,'playback: feed ze sitem opublikowanym przy cycleTs+batch_s');
+   const first=await untilScan(v=>v.token==='A0'||v.token==='SOL'||v.token==='MILES',4000);
+   chk(first.token==='A0'&&!first.pass,'batch odebrany przy cycleTs+batch_s startuje od A0, nie od SOL (jest '+(first.token||'—')+')');
+   const passed=await untilScan(v=>v.pass&&v.token==='MILES',16000);
+   chk(passed.pass&&passed.token==='MILES','batch dochodzi do pieczątki PASS na MILES (jest '+(passed.token||'—')+(passed.pass?' PASS':'')+')');
+   const lateIv=20;
+   const now2=Date.now();
+   const lateTs=new Date(now2-(lateIv+30+batch_s)*1000).toISOString();
+   posted=await fp({positions:[],activity:[],scan_sieve:{batch_id:'late-'+now2,cycleTs:lateTs,interval_s:lateIv,batch_s,total:4,handoff_n:1,items:[
+    {symbol:'B0',stage:'cheap_reject',reason:'cheap',handoff:false},
+    {symbol:'B1',stage:'cheap_reject',reason:'cheap',handoff:false},
+    {symbol:'B2',stage:'soft_pass',reason:'handoff',handoff:true},
+    {symbol:'SOL',stage:'cheap_reject',reason:'cheap',handoff:false}
+   ]}});
+   chk(posted.s===200,'playback: nowy batch_id zastępuje trwające sito');
+   const restarted=await untilScan(v=>v.token==='B0'||v.token==='SOL',3000);
+   chk(restarted.token==='B0'&&!restarted.pass,'po oknie nowy batch wraca na B0 zamiast zamarzać na SOL (jest '+(restarted.token||'—')+')');
+   const moved=await untilScan(v=>v.pass&&v.token==='B2',8000);
+   chk(moved.pass&&moved.token==='B2','po restarcie sito leci do PASS, nie stoi na pierwszej klatce (jest '+(moved.token||'—')+(moved.pass?' PASS':'')+')');
+  }finally{ await br.close(); }
+ }
  fr=await fp({positions:[{id:'U-1',bot:'RISK',symbol:'Łódź',chain:'solana',side:'LONG',size:10,entry:1,price:1.1,mode:'SHADOW'}],activity:[]});
  fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
  chk(fl.some(p=>p.symbol==='Łódź'),'Symbol z polskimi znakami zostaje na tablicy');
@@ -238,7 +307,7 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  pf=await fetch('http://localhost:3999/api/portfolio').then(r=>r.json());
  chk(fr.s===200&&pf.fees===12.5,'portfolio.fees opcjonalne przechodzi');
  const v2=await fetch('http://localhost:3999/v2').then(async r=>({s:r.status,t:await r.text()}));
- chk(v2.s===200&&/ARCADE OFFICE/.test(v2.t)&&/v2\.js/.test(v2.t)&&/v2\.css/.test(v2.t),'GET /v2 serwuje nową tablicę');
+ chk(v2.s===200&&/ARCADE OFFICE/.test(v2.t)&&/v2\.js\?v=12/.test(v2.t)&&/sieve-timing\.js\?v=12/.test(v2.t)&&/v2\.css\?v=12/.test(v2.t),'GET /v2 serwuje nową tablicę (cache v=12)');
  const home=await fetch('http://localhost:3999/').then(async r=>({s:r.status,t:await r.text()}));
  chk(home.s===200&&/game\.js/.test(home.t)&&!/v2\.js/.test(home.t),'GET / nadal serwuje starą tablicę');
  fc.disconnect();
