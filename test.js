@@ -183,7 +183,20 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
   const cleared=await fetch('http://localhost:3999/api/vet').then(r=>r.json());
   const stillBook=await fetch('http://localhost:3999/api/sieve?seat=book').then(r=>r.json());
   chk(cleared&&cleared.seat==='vet'&&cleared.items==null&&stillBook.batch_id==='book-1','vet_sieve:null czyści VET i nie rusza BOOK');
-  fr=await fp({positions:[],activity:[],book_sieve:null,scan_sieve:null});
+  fr=await fp({positions:[],activity:[],size_sieve:{batch_id:'size-ticket',cycleTs:'2026-11-10T12:00:00Z',interval_s:60,batch_s:0,total:4,handoff_n:3,items:[
+    {symbol:'MAYA',stage:'handoff',reason:'$40.00 (11.8% free cash)',handoff:true,ticket_usd:40},
+    {symbol:'HALF',stage:'handoff',reason:'$1.00 (1% free cash)',handoff:true,ticket_usd:40.126},
+    {symbol:'BAD',stage:'size_zero',reason:'$9.00 nope',handoff:false,ticket_usd:'nope'},
+    {symbol:'STR',stage:'handoff',reason:'ok',handoff:true,ticket_usd:'12.5'}
+  ]}});
+  chk(fr.s===200,'Feed z size_sieve i ticket_usd -> 200');
+  const szSeat=await fetch('http://localhost:3999/api/sieve?seat=size').then(r=>r.json());
+  const bySz={}; for(const it of (szSeat.items||[])) bySz[it.symbol]=it;
+  chk(bySz.MAYA&&bySz.MAYA.ticket_usd===40&&bySz.MAYA.reason==='$40.00 (11.8% free cash)','cleanSieve przepuszcza ticket_usd i reason');
+  chk(bySz.HALF&&bySz.HALF.ticket_usd===40.126,'ticket_usd zostaje dokładną liczbą');
+  chk(bySz.BAD&&bySz.BAD.ticket_usd==null&&bySz.BAD.reason==='$9.00 nope','zły ticket_usd nie jest wymyślany');
+  chk(bySz.STR&&bySz.STR.ticket_usd===12.5,'liczbowy string ticket_usd staje się liczbą');
+  fr=await fp({positions:[],activity:[],book_sieve:null,scan_sieve:null,size_sieve:null});
   const emptyAll=await fetch('http://localhost:3999/api/sieve').then(r=>r.json());
   chk(emptyAll.scan==null&&emptyAll.vet==null&&emptyAll.book==null&&emptyAll.size==null&&emptyAll.fills==null,'puste sita per seat po czyszczeniu');
  }
@@ -278,8 +291,45 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
      return {BOOK:read('BOOK'), SIZE:read('SIZE'), FILLS:read('FILLS')};
    });
    chk(tags.BOOK==='PASS → SIZE'&&tags.SIZE==='PASS → FILLS'&&tags.FILLS==='PASS → RISK','tagi PASS kolejnych seatów: SIZE, FILLS, RISK (jest '+JSON.stringify(tags)+')');
+   const sizeAmt=await pg.evaluate(()=>{
+     const now=new Date().toISOString();
+     const show=item=>{
+       window.AO2.noteSieve('SIZE', {batch_id:'size-amt-'+item.symbol, cycleTs:now, interval_s:60, batch_s:0, total:1, handoff_n:1, items:[Object.assign({stage:'handoff', handoff:true}, item)]});
+       window.AO2.holdSieve('SIZE','pass');
+       const el=document.querySelector('[data-seat="SIZE"] .tag .txt');
+       if(!el) return {text:'', over:true};
+       return {text:el.textContent, over:el.scrollWidth>el.clientWidth+1};
+     };
+     return {
+       usd:show({symbol:'MAYA', reason:'$40.00 (11.8% free cash)', ticket_usd:40}),
+       reason:show({symbol:'NORAW', reason:'$40.00 (11.8% free cash)'}),
+       none:show({symbol:'NOAMT', reason:'free cash'}),
+       dec:show({symbol:'DECIM', reason:'$1.00 (1% free cash)', ticket_usd:40.5}),
+       prefer:show({symbol:'PREFER', reason:'$9.00 (x)', ticket_usd:40}),
+       mid:show({symbol:'MIDWAY', reason:'bilet $40.00'})
+     };
+   });
+   chk(sizeAmt.usd.text==='PASS → FILLS · $40.00'&&!sizeAmt.usd.over,'SIZE PASS z ticket_usd pokazuje $40.00 i mieści się na tabliczce (jest '+sizeAmt.usd.text+')');
+   chk(sizeAmt.reason.text==='PASS → FILLS · $40.00','SIZE PASS bez ticket_usd bierze wiodące $ z reason (jest '+sizeAmt.reason.text+')');
+   chk(sizeAmt.none.text==='PASS → FILLS','SIZE PASS bez kwoty zostaje przy PASS → FILLS (jest '+sizeAmt.none.text+')');
+   chk(sizeAmt.dec.text==='PASS → FILLS · $40.50','ticket_usd formatuje się do 2 miejsc (jest '+sizeAmt.dec.text+')');
+   chk(sizeAmt.prefer.text==='PASS → FILLS · $40.00','ticket_usd wygrywa z inną kwotą w reason (jest '+sizeAmt.prefer.text+')');
+   chk(sizeAmt.mid.text==='PASS → FILLS','$ w środku reason nie jest kwotą wejścia (jest '+sizeAmt.mid.text+')');
    await pg.click('#audioBtn');
    await wait(200);
+   posted=await fp({positions:[],activity:[],size_sieve:{batch_id:'size-quiet-'+Date.now(), cycleTs:new Date().toISOString(), interval_s:120, batch_s:0, total:1, handoff_n:0, items:[{symbol:'QUIETSZ', stage:'size_zero', reason:'zero', handoff:false}]}});
+   chk(posted.s===200,'size_sieve odrzutu do próby dźwięku');
+   const quietSz=await untilSeat('SIZE', v=>v.token==='QUIETSZ', 4000);
+   chk(quietSz.token==='QUIETSZ'&&!quietSz.pass,'sito SIZE jest aktywne na odrzucie');
+   const szHeld=await pg.evaluate(()=>window.AO2.sfxLog().filter(x=>x.id==='size_pass').length);
+   posted=await fp({positions:[],activity:[{ts:new Date().toISOString(),bot:'SIZE',text:'Przekazuję MAYA do FILLS',kind:'handoff'}]});
+   await wait(700);
+   const szHeld2=await pg.evaluate(()=>window.AO2.sfxLog().filter(x=>x.id==='size_pass').length);
+   chk(szHeld2===szHeld,'maybeSizeSound nie puszcza size_pass, gdy sito SIZE jest aktywne');
+   posted=await fp({positions:[],activity:[{ts:new Date().toISOString(),bot:'SIZE',text:'Przekazałem MAYA do FILLS',kind:'handoff'}],size_sieve:null});
+   await wait(700);
+   const szHeld3=await pg.evaluate(()=>window.AO2.sfxLog().filter(x=>x.id==='size_pass').length);
+   chk(szHeld3===szHeld2+1,'bez size_sieve maybeSizeSound puszcza size_pass na przekazaniu');
    const batch_s_v=2;
    const tV=Date.now();
    const vetPlay={batch_id:'vet-play-'+tV, cycleTs:new Date(tV-batch_s_v*1000).toISOString(), interval_s:VETFIX.preview_interval_s, batch_s:batch_s_v, total:VETFIX.items.length, handoff_n:1, items:VETFIX.items.map(it=>({symbol:it.symbol,address:it.address,chain:it.chain,mcap_usd:it.mcap_usd,marketCap:it.marketCap,stage:it.stage,reason:it.reason,handoff:it.handoff}))};
@@ -437,7 +487,7 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  pf=await fetch('http://localhost:3999/api/portfolio').then(r=>r.json());
  chk(fr.s===200&&pf.fees===12.5,'portfolio.fees opcjonalne przechodzi');
  const v2=await fetch('http://localhost:3999/v2').then(async r=>({s:r.status,t:await r.text()}));
- chk(v2.s===200&&/ARCADE OFFICE/.test(v2.t)&&/v2\.js\?v=13/.test(v2.t)&&/sieve-timing\.js\?v=13/.test(v2.t)&&/v2\.css\?v=13/.test(v2.t),'GET /v2 serwuje nową tablicę (cache v=13)');
+  chk(v2.s===200&&/ARCADE OFFICE/.test(v2.t)&&/v2\.js\?v=14/.test(v2.t)&&/sieve-timing\.js\?v=14/.test(v2.t)&&/v2\.css\?v=14/.test(v2.t),'GET /v2 serwuje nową tablicę (cache v=14)');
  const home=await fetch('http://localhost:3999/').then(async r=>({s:r.status,t:await r.text()}));
  chk(home.s===200&&/game\.js/.test(home.t)&&!/v2\.js/.test(home.t),'GET / nadal serwuje starą tablicę');
  fc.disconnect();

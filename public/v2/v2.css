@@ -225,6 +225,11 @@ button.on{background:#3a2e18;color:var(--amber);border-color:var(--brass)}
 .station .tag.empty{opacity:.45}
 .station .tag.passc .txt{color:#b8f0c8}
 .station .tag .txt.sm{font-size:12px;letter-spacing:.02em}
+.station .tag .txt.long{
+  display:block;width:100%;min-width:0;box-sizing:border-box;
+  font-size:11px;letter-spacing:0;padding:0 8px;line-height:1.15;
+  white-space:nowrap;text-align:center;
+}
 .station .tag .txt{
   display:flex;align-items:center;justify-content:center;
   padding:0 10px;max-width:100%;
@@ -621,6 +626,7 @@ html[data-theme="light"] .mano-plaque .val{text-shadow:none}
   .station .nixie .digit.d4{font-size:15px}
   .station .tag{height:30px;min-width:110px;width:84%;margin-top:2px}
   .station .tag .txt{font-size:12px;letter-spacing:.04em}
+  .station .tag .txt.long{font-size:10px;letter-spacing:0;padding:0 5px;line-height:1.1}
   #posTable{overflow:visible}
   .pl-head,.pl-row{grid-template-columns:minmax(0,1.6fr) minmax(0,.9fr) minmax(0,.85fr) minmax(0,.45fr)}
   .c-h1,.c-h6,.c-mcap,.c-pass{display:none}

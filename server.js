@@ -215,6 +215,7 @@ function cleanSieve(raw){
     items.push({
       symbol, address:cleanAddr(it.address), chain:str(it.chain,16), image:cleanImage(it.image),
       mcap_usd:mcap, marketCap:mcap, stage, reason:it.reason?String(it.reason).replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').slice(0,180):'',
+      ticket_usd:numOr(it.ticket_usd),
       handoff
     });
   }
