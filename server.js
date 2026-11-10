@@ -139,7 +139,7 @@ function deskItems(l){return (Array.isArray(l)?l:[]).filter(c=>{const s=String(c
   rank:i+1,symbol:String(c.ticker??c.symbol??'').replace(/[<>]/g,'').slice(0,40),name:c.name?String(c.name).replace(/[<>]/g,'').slice(0,40):String(c.chain||''),chain:c.chain||null,
   address:cleanAddr(c.address),price:finTop(c.priceUSD??c.price),marketCap:finTop(c.marketCap),fdv:finTop(c.fdv),liquidity:finTop(c.liquidity),
   volume:finTop(c.volume??c.volume_h1),change5m:finTop(c.change_5m??c.change5m),change1h:finTop(c.change_1h??c.change1h),change6h:finTop(c.change_6h??c.change6h),
-  change24h:finTop(c.change_24h!=null?c.change_24h:c.change24h),buys:finTop(c.buys),sells:finTop(c.sells),holders:finTop(c.holders),stage:c.stage||null,reason:c.reason?String(c.reason).replace(/[<>]/g,'').slice(0,180):''}));}
+  change24h:finTop(c.change_24h!=null?c.change_24h:c.change24h),buys:finTop(c.buys),sells:finTop(c.sells),holders:finTop(c.holders),stage:c.stage||null,reason:c.reason?String(c.reason).replace(/[\u0000-\u001f]/g,'').slice(0,180):''}));}
 // Zlotr 2026-10-22 22:39: top 12 + previous SCAN batch (top10_prev from sync-feed) for the second TOP DESK table
 function deskTop10(){if(!desk||!Array.isArray(desk.top10)||!desk.top10.length)return null;
   const pv=Array.isArray(desk.top10_prev)&&desk.top10_prev.length?{updatedAt:Date.parse(desk.top10_prev_cycle_ts)||null,items:deskItems(desk.top10_prev)}:null;
@@ -214,7 +214,7 @@ function cleanSieve(raw){
     const handoff=it.handoff===true||it.handoff===1||String(it.handoff||'').toLowerCase()==='true'||stage==='handoff';
     items.push({
       symbol, address:cleanAddr(it.address), chain:str(it.chain,16), image:cleanImage(it.image),
-      mcap_usd:mcap, marketCap:mcap, stage, reason:it.reason?String(it.reason).replace(/[<>]/g,'').replace(/[\u0000-\u001f]/g,'').slice(0,180):'',
+      mcap_usd:mcap, marketCap:mcap, stage, reason:it.reason?String(it.reason).replace(/[\u0000-\u001f]/g,'').slice(0,180):'',
       ticket_usd:numOr(it.ticket_usd),
       handoff
     });

@@ -110,9 +110,12 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  chk(fr.s==200&&fr.j.closed.length==1&&fr.j.activity==1,'Feed: brakująca pozycja zamknięta, nowa aktywność');await wait(300);
  chk(fev.some(([e,d])=>e=='positionClosed'&&d=='feed-T-1')&&fev.some(([e,d])=>e=='bubble'&&d.id=='bot-RISK'&&/Zamykam TFEED/.test(d.text)),'Zamknięcie ogłoszone');
  const gf=await fetch(F).then(r=>r.json());chk(gf.lastFeedAt&&gf.activity.length==3&&gf.positions.length==0,'GET /api/feed');
- fr=await fp({positions:[],activity:[],top10:[{ticker:'AAA',chain:'solana',priceUSD:1,marketCap:10,liquidity:5,change_1h:1.5,stage:'soft_pass',reason:'soft pass'},{ticker:'BBB',chain:'solana',priceUSD:1,marketCap:10,liquidity:5,change_1h:-1,stage:'cheap_reject',reason:'cheap'}],top10_rule:'test',top10_cycle_ts:'2026-10-27T12:00:00Z'});
+ fr=await fp({positions:[],activity:[],top10:[{ticker:'AAA',chain:'solana',priceUSD:1,marketCap:10,liquidity:5,change_1h:1.5,stage:'soft_pass',reason:'soft pass >50 <1 ≥2\u0001',name:'Na<me>'},{ticker:'BBB',chain:'solana',priceUSD:1,marketCap:10,liquidity:5,change_1h:-1,stage:'cheap_reject',reason:'cheap'}],top10_rule:'test',top10_cycle_ts:'2026-10-27T12:00:00Z'});
  const sc=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
  chk(sc.total===1&&sc.tokens&&sc.tokens[0].symbol==='AAA'&&!sc.tokens.some(t=>String(t.symbol).toUpperCase()==='BBB'),'Skan: cheap_reject (CHP-) nie wchodzi na tablicę');
+ const deskTop=await fetch('http://localhost:3999/api/top10').then(r=>r.json());
+ const aaa=deskTop&&deskTop.items&&deskTop.items.find(x=>x.symbol==='AAA');
+ chk(!!(aaa&&aaa.reason==='soft pass >50 <1 ≥2'&&aaa.name==='Name'&&aaa.symbol==='AAA'),'deskItems zostawia < > ≥ w reason, ścina sterujące, a nazwę i ticker nadal czyści z <>');
  const sieve={batch_id:'20261109T232157',cycleTs:'2026-11-09T23:21:57+01:00',interval_s:142,gap_s:20,batch_s:121.7,total:3,total_uncapped:3,handoff_n:1,preview:false,cap:200,items:[
    {symbol:'forg',address:'MintForg',chain:'solana',image:'https://img.example/forg.png',mcap_usd:143943,marketCap:143943,stage:'cheap_reject',reason:'holders=45, top_10=1.00',handoff:false},
    {symbol:'MILES',address:'MintMiles',chain:'solana',image:'javascript:alert(1)',stage:'soft_pass',reason:'handoff',handoff:true},
@@ -142,7 +145,7 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
   const vetPayload={batch_id:VETFIX.batch_id,cycleTs:VETFIX.cycleTs,interval_s:VETFIX.interval_s_live,batch_s:VETFIX.batch_s,total:VETFIX.total+4,handoff_n:VETFIX.handoff_n,items:VETFIX.items.concat([
     {symbol:'FEE',stage:'fee_floor',reason:'fee',handoff:false},
     {symbol:'ZERO',stage:'size_zero',reason:'zero',handoff:false},
-    {symbol:'CUSTOM',stage:'Custom_Slug',reason:'x',handoff:false},
+    {symbol:'CUSTOM',stage:'Custom_Slug',reason:'a<b≥c>\u0001z',handoff:false},
     {symbol:'HARD',stage:'hard_pass',reason:'hard pass',handoff:false}
   ])};
   fr=await fp({positions:[],activity:[],vet_sieve:vetPayload,book_sieve:{batch_id:'book-1',cycleTs:VETFIX.cycleTs,interval_s:30,batch_s:1,total:1,handoff_n:1,items:[{symbol:'B1',stage:'soft_pass',reason:'ok',handoff:true}]}});
@@ -160,6 +163,7 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
   chk(bySym.X&&bySym.X.stage==='soft_pass'&&bySym.X.handoff===true,'soft_pass z handoff=true zostaje przekazaniem do BOOK');
   chk(bySym.HARD&&bySym.HARD.stage==='hard_pass'&&bySym.HARD.handoff===false,'hard_pass bez handoff nie jest przekazaniem');
   chk(bySym.FEE&&bySym.FEE.stage==='fee_floor'&&bySym.ZERO&&bySym.ZERO.stage==='size_zero'&&bySym.CUSTOM&&bySym.CUSTOM.stage==='custom_slug','fee_floor, size_zero i nieznany stage jako slug');
+  chk(bySym.CUSTOM&&bySym.CUSTOM.reason==='a<b≥c>z'&&bySym.DERP404&&bySym.DERP404.reason==='already_priced=h1 182.0>50.0'&&bySym.OnlyCats&&bySym.OnlyCats.reason==='rejected soft_reject <85 min ago, no clear price/volume move','cleanSieve zostawia < > ≥ w reason i ścina znaki sterujące');
   chk(fev.slice(nSieve).some(([e,d])=>e==='sieve'&&d.seat==='vet'&&d.batch_id===VETFIX.batch_id)&&fev.slice(nSieve).some(([e,d])=>e==='sieve'&&d.seat==='book'),'Socket sieve niesie {seat,...}');
   let scKeep=await fetch('http://localhost:3999/api/scan').then(r=>r.json());
   chk(scKeep.total===1&&scKeep.scan_sieve==null,'vet_sieve nie zmienia /api/scan ani top-12');
@@ -338,10 +342,11 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
    chk(posted.s===200,'playback VET: fixture 20261110T113353');
    const pep=await untilSeat('VET', v=>v.token==='Pepetide', 8000);
    chk(pep.token==='Pepetide'&&!pep.pass&&pep.stamp===''&&pep.count==='0'&&pep.tag==='top_wallet=0.1622','VET odrzut Pepetide: nixie 0, powód, bez PASS (jest '+(pep.token||'—')+' / '+(pep.tag||'')+' / '+(pep.count||'')+')');
-   const xpass=await untilSeat('VET', v=>v.pass&&v.token==='X', 16000);
+   const xpass=await untilSeat('VET', v=>v.pass&&v.token==='X', 28000);
    chk(xpass.pass&&xpass.token==='X'&&xpass.stamp==='PASS'&&xpass.count==='1'&&xpass.tag==='PASS → BOOK','VET playback fixture dochodzi do PASS → BOOK na X, nixie 1 (jest '+(xpass.token||'—')+' '+(xpass.tag||'')+' '+(xpass.count||'')+(xpass.pass?' PASS':'')+')');
    const passAfter=await pg.evaluate(()=>window.AO2.sfxLog().filter(x=>x.id==='vet_pass').length);
    chk(passAfter===passBefore+1,'klatka PASS VET puszcza vet_pass (gain ze słownika, głośnik włączony)');
+   await pg.evaluate(()=>window.AO2.stopSieve('VET'));
    posted=await fp({positions:[],activity:[],vet_sieve:{batch_id:'vet-quiet-'+Date.now(), cycleTs:new Date().toISOString(), interval_s:120, batch_s:0, total:1, handoff_n:0, items:[{symbol:'QUIET', stage:'hard_reject', reason:'top_wallet=0.9', handoff:false}]}});
    const quiet=await untilSeat('VET', v=>v.token==='QUIET', 4000);
    chk(quiet.token==='QUIET'&&!quiet.pass,'sito VET jest aktywne na odrzucie');
@@ -376,6 +381,121 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
    chk(posted.s===200,'playback VET: spóźniona partia wraca na start');
    const restartedV=await untilSeat('VET', v=>v.token==='FAIR'||v.token==='HWAN', 4000);
    chk(restartedV.token==='FAIR'&&!restartedV.pass,'po oknie VET wraca na FAIR, nie zostaje na końcu (jest '+(restartedV.token||'—')+')');
+   const dwellChk=await pg.evaluate(()=>{
+     delete window.__SIEVE_VET_DWELL_MS;
+     delete window.__SIEVE_PREVIEW_DWELLS;
+     delete window.__SIEVE_SPEED;
+     delete window.__sieveNow;
+     window.AO2.stopSieve('VET');
+     const dwellFor=n=>Math.max(4000, Math.min(8000, (0.92*30*1000)/Math.max(1, n|0)));
+     const iso=new Date().toISOString();
+     const readN=n=>{
+       window.AO2.stopSieve('VET');
+       const items=Array.from({length:n},(_,i)=>({symbol:'D'+i, address:'dwell'+n+'x'+i, stage:'hard_reject', reason:'r', handoff:false}));
+       window.AO2.noteSieve('VET', {batch_id:'dwell-'+n, cycleTs:iso, interval_s:120, batch_s:0, total:n, handoff_n:0, items});
+       const plan=window.AO2.dwells('VET');
+       return plan&&plan.dwells?plan.dwells.slice():[];
+     };
+     return {d2:readN(2), d5:readN(5), d8:readN(8), e2:dwellFor(2), e5:dwellFor(5), e8:dwellFor(8), interval:window.AO2.dwells('VET').intervalMs, hook:window.__SIEVE_VET_DWELL_MS};
+   });
+   const sameD=(a,n,e)=>Array.isArray(a)&&a.length===n&&a.every(x=>Math.abs(x-e)<0.001);
+   chk(dwellChk.hook==null&&dwellChk.interval===30000&&sameD(dwellChk.d2,2,dwellChk.e2)&&sameD(dwellChk.d5,5,dwellChk.e5)&&sameD(dwellChk.d8,8,dwellChk.e8),'VET dwell clamp(0.92*30s/N, 4–8s) gdy hook jest wyłączony');
+   await pg.evaluate(()=>{
+     window.__SIEVE_VET_DWELL_MS=120;
+     window.__SIEVE_PREVIEW_DWELLS=(seat, sv)=>{
+       if(seat!=='SCAN') return null;
+       return {dwells:sv.items.map((_,i)=>i===0?60000:80), intervalMs:120000};
+     };
+     window.AO2.stopSieve();
+     const iso=new Date().toISOString();
+     const tok=(symbol, address, reason, handoff)=>({symbol, address, stage:handoff?'soft_pass':'cheap_reject', reason, handoff:!!handoff});
+     const pack=(id, items)=>({batch_id:id, cycleTs:iso, interval_s:120, batch_s:0, total:items.length, handoff_n:items.filter(x=>x.handoff).length, items});
+     window.AO2.noteSieve('SCAN', pack('lock-1', [
+       tok('REJ','addrRej','cheap',false),
+       tok('If','addrIf','soft pass',true),
+       tok('Steve','addrSteve','soft pass',true),
+       tok('BIG','addrBig','already_priced=h1 462.0>50.0',true)
+     ]));
+     window.AO2.holdSieve('SCAN', 0);
+     window.AO2.noteSieve('VET', pack('lock-1', [
+       tok('BIG','addrBig','already_priced=h1 462.0>50.0',true),
+       tok('Steve','addrSteve','soft pass',true),
+       tok('If','addrIf','soft pass',true)
+     ]));
+   });
+   const waiting=await pg.evaluate(()=>{
+     const el=document.querySelector('[data-seat="VET"]');
+     const st=window.AO2.sieveOf('VET');
+     return {
+       tag:el.querySelector('.tag .txt').textContent,
+       pass:el.classList.contains('pass'),
+       order:(st.batch.items||[]).map(x=>x.symbol).join(','),
+       queued:!!window.AO2.queue().VET,
+       badge:!!document.querySelector('[data-sieve-queue], .sieve-queue, .kolejka'),
+       textHasKolejka:/kolejka/i.test(document.body.innerText||'')
+     };
+   });
+   chk(waiting.tag==='czeka na SCAN'&&!waiting.pass&&waiting.order==='If,Steve,BIG'&&!waiting.queued&&!waiting.badge&&!waiting.textHasKolejka,'VET czeka na SCAN i ustawia kolejność PASS ze SCAN, bez plakietki kolejki ('+JSON.stringify(waiting)+')');
+   const playing=await pg.evaluate(()=>{
+     window.AO2.holdSieve('SCAN', 1);
+     const el=document.querySelector('[data-seat="VET"]');
+     const iso=new Date().toISOString();
+     const one=id=>({batch_id:id, cycleTs:iso, interval_s:30, batch_s:0, total:1, handoff_n:0, items:[{symbol:id, address:'addr-'+id, stage:'hard_reject', reason:'queued', handoff:false}]});
+     window.AO2.noteSieve('VET', one('q-old'));
+     window.AO2.noteSieve('VET', one('q-new'));
+     window.AO2.noteSieve('VET', one('lock-1'));
+     const st=window.AO2.sieveOf('VET');
+     const q=window.AO2.queue().VET;
+     return {
+       token:el.querySelector('.tname').textContent,
+       pass:el.classList.contains('pass'),
+       tag:el.querySelector('.tag .txt').textContent,
+       batch:st.batch&&st.batch.batch_id,
+       order:(st.batch.items||[]).map(x=>x.symbol).join(','),
+       q:q&&q.batch_id
+     };
+   });
+   chk(playing.token==='If'&&playing.pass&&playing.tag==='PASS → BOOK'&&playing.batch==='lock-1'&&playing.order==='If,Steve,BIG'&&playing.q==='q-new','po klatce PASS If VET gra If, a nowsza partia czeka w kolejce bez ucinania ('+JSON.stringify(playing)+')');
+   await pg.evaluate(()=>{ window.AO2.holdSieve('SCAN', 2); window.AO2.holdSieve('SCAN', 3); });
+   const queuedStart=await untilSeat('VET', v=>v.token==='q-new', 4000);
+   chk(queuedStart.token==='q-new'&&!queuedStart.pass,'po końcu partii startuje najnowsza kolejka (jest '+(queuedStart.token||'—')+')');
+   const plate=await pg.evaluate(()=>{
+     const iso=new Date().toISOString();
+     const reason='already_priced=h1 462.0>50.0<≥';
+     window.AO2.stopSieve('VET');
+     window.AO2.noteSieve('VET', {batch_id:'keep-1', cycleTs:iso, interval_s:30, batch_s:0, total:1, handoff_n:0, items:[{symbol:'RCAT', address:'addrRcat', stage:'hard_reject', reason, handoff:false}]});
+     const mid=document.querySelector('[data-seat="VET"] .tag .txt');
+     window.AO2.noteSieve('VET', {batch_id:'drop-me', cycleTs:iso, interval_s:30, batch_s:0, total:1, handoff_n:0, items:[{symbol:'DROP', address:'addrDrop', stage:'hard_reject', reason:'x', handoff:false}]});
+     const queued=window.AO2.queue().VET&&window.AO2.queue().VET.batch_id;
+     const cur=window.AO2.sieveOf('VET').batch&&window.AO2.sieveOf('VET').batch.batch_id;
+     window.AO2.stopSieve('VET');
+     const afterStop=window.AO2.queue().VET||null;
+     delete window.__SIEVE_VET_DWELL_MS;
+     delete window.__SIEVE_PREVIEW_DWELLS;
+     window.AO2.noteSieve('VET', {batch_id:'lock-1', cycleTs:iso, interval_s:30, batch_s:0, total:1, handoff_n:1, items:[{symbol:'If', address:'addrIf', stage:'soft_pass', reason:'soft pass', handoff:true}]});
+     const late=document.querySelector('[data-seat="VET"]');
+     window.AO2.stopSieve('BOOK');
+     window.AO2.noteSieve('BOOK', {batch_id:'book-a', cycleTs:iso, interval_s:60, batch_s:0, total:1, handoff_n:0, items:[{symbol:'BA', stage:'soft_reject', reason:'old', handoff:false}]});
+     window.AO2.noteSieve('BOOK', {batch_id:'book-b', cycleTs:iso, interval_s:60, batch_s:0, total:1, handoff_n:0, items:[{symbol:'BB', stage:'soft_reject', reason:'a<b>c≥', handoff:false}]});
+     const book=document.querySelector('[data-seat="BOOK"]');
+     const bookTag=book.querySelector('.tag .txt');
+     return {
+       text:mid?mid.textContent:'',
+       html:mid?mid.innerHTML:'',
+       cls:mid?mid.className:'',
+       cur, queued, afterStop,
+       lateToken:late.querySelector('.tname').textContent,
+       lateTag:late.querySelector('.tag .txt').textContent,
+       bookToken:book.querySelector('.tname').textContent,
+       bookTag:bookTag?bookTag.textContent:'',
+       bookBatch:window.AO2.sieveOf('BOOK').batch.batch_id,
+       kolejka:/kolejka/i.test(document.body.innerText||'')
+     };
+   });
+   chk(plate.text==='already_priced=h1 462.0>50.0<≥'&&plate.html.includes('&gt;')&&plate.html.includes('&lt;')&&!/>/.test(plate.html)&&plate.cls.includes('xlong'),'tabliczka VET zostawia < > ≥ i mieści already_priced (jest '+plate.text+' / '+plate.cls+')');
+   chk(plate.cur==='keep-1'&&plate.queued==='drop-me'&&plate.afterStop==null,'stopSieve czyści kolejkę VET, bieżąca partia nie jest ucinana przez następną');
+   chk(plate.lateToken==='If'&&plate.lateTag==='PASS → BOOK','spóźniony VET startuje od razu, gdy PASS tego adresu już był na SCAN');
+   chk(plate.bookToken==='BB'&&plate.bookTag==='a<b>c≥'&&plate.bookBatch==='book-b'&&!plate.kolejka,'BOOK nadal wymienia partię od razu, a powód trzyma < > ≥');
   }finally{ await br.close(); }
  }
  fr=await fp({positions:[{id:'U-1',bot:'RISK',symbol:'Łódź',chain:'solana',side:'LONG',size:10,entry:1,price:1.1,mode:'SHADOW'}],activity:[]});
@@ -390,7 +510,7 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
    row('fix-1',{symbol:'',displaySymbol:'Żółć',bot:'VET',size:3}),
    row('old-1',{symbol:'OLDFEED',bot:'BOOK',price:1.2,size:4}),
    row('mem-1',{symbol:'MEM',displaySymbol:'Pamięć',peakPct:120,price:1,size:8})
- ],activity:[{ts:'2026-10-27T18:44:00+02:00',bot:'VET',text:'Widzę Inuween oraz ███WIF \u0001🚀 żółć \u202e',kind:'note'}],
+ ],activity:[{ts:'2026-10-27T18:44:00+02:00',bot:'VET',text:'Widzę Inuween oraz <>███WIF \u0001🚀 żółć \u202e',kind:'note'}],
   botEvents:{RISK:[{ts:'2026-10-27T18:44:00+02:00',text:'Pilnuje ███WIF i Inuween 🚀'}]}};
  fr=await fp(sample);chk(fr.s==200&&fr.j.opened.length>=6,'Feed z nowymi polami (unicode, ujemny szczyt) przechodzi');
  fl=await fetch('http://localhost:3999/api/positions').then(r=>r.json());
@@ -427,7 +547,7 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  const evS=gf2.posEvents.find(e=>e.action==='SELL'&&e.displaySymbol==='███WIF');
  chk(evC&&evC.peak===69.38&&evC.address==='MintPeak99'&&evC.displaySymbol==='Szczyt','posEvents CLOSE niesie address i peak');
  chk(evS&&evS.peak===12&&evS.address==='AbC123','posEvents SELL niesie address i peak');
- chk(gf2.activity.some(a=>a.text.includes('Inuween')&&a.text.includes('███WIF')&&a.text.includes('🚀')&&a.text.includes('żółć')&&!a.text.includes('\u0001')&&!a.text.includes('\u202e')),'Aktywność trzyma Unicode, bez sterujących i bidi');
+ chk(gf2.activity.some(a=>a.text.includes('Inuween')&&a.text.includes('███WIF')&&a.text.includes('🚀')&&a.text.includes('żółć')&&!a.text.includes('\u0001')&&!a.text.includes('\u202e')&&!a.text.includes('<')&&!a.text.includes('>')),'Aktywność trzyma Unicode, bez sterujących, bidi i <>');
  const bev=await fetch('http://localhost:3999/api/bot-events').then(r=>r.json());
  chk(bev.RISK&&bev.RISK.some(x=>x.text.includes('███WIF')&&x.text.includes('🚀')&&x.text.includes('Inuween')),'botEvents trzymają Unicode');
  const live={positions:[
@@ -487,7 +607,7 @@ try{let t10=null;for(let i=0;i<30&&!t10;i++){await wait(150);t10=await fetch('ht
  pf=await fetch('http://localhost:3999/api/portfolio').then(r=>r.json());
  chk(fr.s===200&&pf.fees===12.5,'portfolio.fees opcjonalne przechodzi');
  const v2=await fetch('http://localhost:3999/v2').then(async r=>({s:r.status,t:await r.text()}));
-  chk(v2.s===200&&/ARCADE OFFICE/.test(v2.t)&&/v2\.js\?v=14/.test(v2.t)&&/sieve-timing\.js\?v=14/.test(v2.t)&&/v2\.css\?v=14/.test(v2.t),'GET /v2 serwuje nową tablicę (cache v=14)');
+  chk(v2.s===200&&/ARCADE OFFICE/.test(v2.t)&&/v2\.js\?v=15/.test(v2.t)&&/sieve-timing\.js\?v=15/.test(v2.t)&&/v2\.css\?v=15/.test(v2.t),'GET /v2 serwuje nową tablicę (cache v=15)');
  const home=await fetch('http://localhost:3999/').then(async r=>({s:r.status,t:await r.text()}));
  chk(home.s===200&&/game\.js/.test(home.t)&&!/v2\.js/.test(home.t),'GET / nadal serwuje starą tablicę');
  fc.disconnect();
