@@ -616,6 +616,7 @@ function stationHtml(bot, st){
   const tcls=n>=14?' xs':n>=10?' xlong':n>=7?' long':'';
   const stamp=st.pass?'<span class="stamp" aria-hidden="true"><span class="ring"></span><span class="lab">PASS</span></span>':'';
   const tagLen=[...String(tag)].length;
+  const tagFit=tagLen>18?' long':tagLen>14?' sm':'';
   return '<div class="frame" aria-hidden="true"></div>'+
     '<div class="inner" aria-hidden="true"></div>'+
     '<div class="lamp" aria-hidden="true"></div>'+
@@ -624,7 +625,7 @@ function stationHtml(bot, st){
       '<div class="tok">'+thumb+stamp+
         '<span class="tname'+tcls+'">'+esc(tok)+'</span></div>'+
       '<div class="nixie"><div class="shell" aria-hidden="true"></div><div class="digit'+dlen+'">'+esc(count)+'</div></div>'+
-      '<div class="tag'+(st.tag?'':' empty')+(st.pass?' passc':'')+'"><span class="txt'+(tagLen>14?' sm':'')+'">'+esc(tag)+'</span></div>'+
+      '<div class="tag'+(st.tag?'':' empty')+(st.pass?' passc':'')+'"><span class="txt'+tagFit+'">'+esc(tag)+'</span></div>'+
     '</div>';
 }
 function renderPipeline(){
@@ -672,8 +673,30 @@ function clearSieveTimer(seat){
   const st=sieveOf(seat);
   if(st.timer){ clearTimeout(st.timer); st.timer=null; }
 }
+function finiteUsd(v){
+  if(typeof v==='number'&&Number.isFinite(v)) return v;
+  if(typeof v==='string'&&v.trim()!==''){
+    const n=+v;
+    if(Number.isFinite(n)) return n;
+  }
+  return null;
+}
+// Leading "$40.00 ..." only. A later dollar figure is not an entry amount.
+function leadingUsd(reason){
+  const m=/^\$(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?/.exec(String(reason||'').trim());
+  if(!m) return null;
+  const n=+(m[1].replace(/,/g,'')+(m[2]||''));
+  return Number.isFinite(n)?n:null;
+}
+function fmtUsd(n){return '$'+n.toFixed(2);}
+function sizePassTag(it){
+  const base=PASS_TAG.SIZE;
+  const n=finiteUsd(it&&it.ticket_usd);
+  const v=n!=null?n:leadingUsd(it&&it.reason);
+  return v==null?base:base+' · '+fmtUsd(v);
+}
 function sieveTag(seat, it, pass){
-  if(pass) return PASS_TAG[seat]||'PASS';
+  if(pass) return seat==='SIZE'?sizePassTag(it):(PASS_TAG[seat]||'PASS');
   let r=String((it&&(it.reason||it.stage))||'–').replace(/[<>]/g,'');
   const chars=[...r];
   if(chars.length>18) r=chars.slice(0,17).join('')+'…';
@@ -914,6 +937,7 @@ function paintAudio(){
   btn.innerHTML=speakerOn?SPK_ON:SPK_OFF;
 }
 function maybeSizeSound(m){
+  if(sieveActive('SIZE')) return;
   if(!m||!m.system) return;
   const bot=String(m.bot||'').toUpperCase();
   if(bot!=='SIZE') return;
