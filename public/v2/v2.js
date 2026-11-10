@@ -686,11 +686,44 @@ function showSieve(i, opts){
   renderPipeline();
   if(opts&&opts.sound&&pass) sfxPlay('scan_pass');
 }
+function cycleHasZone(ts){
+  return /(?:z|[+-]\d{2}(?::?\d{2})?)$/i.test(String(ts||'').trim());
+}
+function warsawOffsetMs(utcMs){
+  try{
+    const fmt=new Intl.DateTimeFormat('en-US',{timeZone:TZ,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const g={};
+    for(const p of fmt.formatToParts(new Date(utcMs))) if(p.type!=='literal') g[p.type]=p.value;
+    const hour=+g.hour;
+    const asUTC=Date.UTC(+g.year,+g.month-1,+g.day,hour===24?0:hour,+g.minute,+g.second);
+    return asUTC-utcMs+(hour===24?86400000:0);
+  }catch(e){ return 3600000; }
+}
+function warsawSuffix(ts){
+  const m=/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(ts||'').trim());
+  if(!m) return '+01:00';
+  const wall=Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0));
+  const off=warsawOffsetMs(wall-warsawOffsetMs(wall));
+  if(!Number.isFinite(off)) return '+01:00';
+  const sign=off>=0?'+':'-';
+  const mins=Math.abs(Math.round(off/60000));
+  return sign+String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+}
+// cycleTs is the SCAN cycle start. The sieve is published batch_s later, so playback
+// starts there. A zoneless stamp is desk-local Europe/Warsaw (CET/CEST).
+function sieveOriginMs(sv){
+  if(!sv) return NaN;
+  const raw=String(sv.cycleTs==null?'':sv.cycleTs).trim();
+  let t0=Date.parse(raw);
+  if(raw&&!cycleHasZone(raw)) t0=Date.parse(raw+warsawSuffix(raw));
+  const batch=Number(sv.batch_s);
+  return Number.isFinite(t0)?t0+(batch>0?batch:0)*1000:NaN;
+}
 function sieveEndMs(){
   if(!sieveBatch) return null;
-  const t0=Date.parse(sieveBatch.cycleTs);
+  const origin=sieveOriginMs(sieveBatch);
   const iv=(Number(sieveBatch.interval_s)>0?Number(sieveBatch.interval_s):120)*1000;
-  return Number.isFinite(t0)?t0+iv:null;
+  return Number.isFinite(origin)?origin+iv:null;
 }
 function scheduleSieve(ms){
   clearSieveTimer();
@@ -742,17 +775,22 @@ function startSieve(sv){
   }
   sieveHold=false;
   let elapsed=0;
-  const t0=Date.parse(sv.cycleTs);
+  const t0=sieveOriginMs(sv);
   if(Number.isFinite(t0)) elapsed=Math.max(0, Date.now()-t0);
   let i=0, acc=0;
   while(i<items.length-1 && acc+(dwells[i]||0)<=elapsed){ acc+=(dwells[i]||0); i++; }
   while(i<items.length-1 && !(dwells[i]>0)) i++;
-  const into=Math.max(0, elapsed-acc);
-  const dwell=dwells[i]||0;
+  let into=Math.max(0, elapsed-acc);
+  let dwell=dwells[i]||0;
   const finished=elapsed>0 && acc+dwell<=elapsed;
+  if(finished){
+    i=0; acc=0; into=0;
+    while(i<items.length-1 && !(dwells[i]>0)) i++;
+    dwell=dwells[i]||0;
+  }
   const fresh=!finished && i===0 && into<400;
   showSieve(i, {sound:fresh});
-  if(!finished && dwell>into) scheduleSieve(dwell-into);
+  if(dwell>into) scheduleSieve(dwell-into);
 }
 function stopSieve(){
   clearSieveTimer();
@@ -768,7 +806,6 @@ function noteSieve(sv){
   const id=String(sv.batch_id||sv.cycleTs||'');
   const cur=sieveBatch?String(sieveBatch.batch_id||sieveBatch.cycleTs||''):'';
   if(sieveBatch&&id&&id===cur) return;
-  if(sieveTimer){ sievePending=sv; return; }
   startSieve(sv);
 }
 function holdSieve(which){
@@ -1245,7 +1282,7 @@ setInterval(()=>{
 
 paintAudio();
 window.AO2={positions:()=>positions, portfolio:()=>portfolio, scan:()=>scan, fixture:()=>fixture, render:renderAll,
-  sieve:()=>sieveFrame, dwells:()=>sievePlan, holdSieve, noteSieve, sfxLog:()=>sfxLog.slice(), speaker:()=>speakerOn,
+  sieve:()=>sieveFrame, dwells:()=>sievePlan, sieveOriginMs, holdSieve, noteSieve, sfxLog:()=>sfxLog.slice(), speaker:()=>speakerOn,
   gauges:()=>Array.from(document.querySelectorAll('#gauges .mano')).map(el=>{
     const n=needleState.get(el.querySelector('.needle'));
     const val=el.querySelector('.mano-plaque .val');
